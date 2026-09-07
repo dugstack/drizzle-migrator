@@ -13,12 +13,13 @@ on:
 
 jobs:
   lib:
-    name: lib (node ${{ matrix.node }})
+    name: lib (node ${{ matrix.node }}, drizzle-orm ${{ matrix.drizzle-orm || 'lockfile' }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         node: [20, 22]
+        drizzle-orm: ["", "0.36.4"]
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +32,10 @@ jobs:
 
       - name: Install
         run: pnpm install --frozen-lockfile
+
+      - name: Pin lowest supported drizzle-orm (peer-range matrix)
+        if: matrix.drizzle-orm != ''
+        run: pnpm --filter @yourorg/drizzle-migrator add drizzle-orm@${{ matrix.drizzle-orm }}
 
       - name: Build
         run: pnpm -r build

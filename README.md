@@ -13,7 +13,7 @@ subpath exports: `/pg`, `/mysql`, `/sqlite`.
 
 ## Status
 
-**Milestone 2 — core engine.** The engine (`runMigrations`, `adoptMigrations`, `getStatus`),
-registry validation, and SQL splitting/ranges are implemented and tested against a fake adapter.
-The pg adapter, CLI, and commands are stubs; see the milestone list in the plan (§11) for what
-ships next.
+**Milestone 3 — pg adapter.** The core engine, registry validation, and SQL splitting are
+implemented; the `/pg` dialect (tracking-table DDL + drift assertion, advisory locking,
+node-postgres adapter) is wired into the `/pg` entry and covered by testcontainers integration
+tests (CI runs them; locally they skip when Docker is unreachable). CLI and commands are next.

@@ -3,12 +3,26 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "exports": {
-    ".": { "types": "./dist/core/index.d.ts", "import": "./dist/core/index.js" },
-    "./pg": { "types": "./dist/pg/index.d.ts", "import": "./dist/pg/index.js" },
-    "./mysql": { "types": "./dist/mysql/index.d.ts", "import": "./dist/mysql/index.js" },
-    "./sqlite": { "types": "./dist/sqlite/index.d.ts", "import": "./dist/sqlite/index.js" }
+    ".": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./pg": {
+      "types": "./dist/pg/index.d.ts",
+      "import": "./dist/pg/index.js"
+    },
+    "./mysql": {
+      "types": "./dist/mysql/index.d.ts",
+      "import": "./dist/mysql/index.js"
+    },
+    "./sqlite": {
+      "types": "./dist/sqlite/index.d.ts",
+      "import": "./dist/sqlite/index.js"
+    }
   },
   "files": ["dist", "skills"],
   "scripts": {
@@ -22,7 +36,11 @@
     "drizzle-orm": ">=0.36.0",
     "pg": ">=8.0.0"
   },
-  "peerDependenciesMeta": { "pg": { "optional": true } },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@testcontainers/postgresql": "^10",
     "@types/node": "^22",
