@@ -13,6 +13,7 @@ subpath exports: `/pg`, `/mysql`, `/sqlite`.
 
 ## Status
 
-**Milestone 1 — scaffold.** The monorepo, package skeleton, build tooling, CI, and compiling
-stubs exist; the engine, pg adapter, CLI, and commands are TODO-throw stubs. See the milestone
-list in the plan (§11) for what ships next.
+**Milestone 2 — core engine.** The engine (`runMigrations`, `adoptMigrations`, `getStatus`),
+registry validation, and SQL splitting/ranges are implemented and tested against a fake adapter.
+The pg adapter, CLI, and commands are stubs; see the milestone list in the plan (§11) for what
+ships next.

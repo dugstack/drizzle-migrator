@@ -1,5 +1,12 @@
 export type MigrationOrigin = "executed" | "adopted";
 
+export type AppliedVersionRow = {
+  version: string;
+  name: string;
+  origin: MigrationOrigin;
+  appliedAt: string;
+};
+
 export type RunMigrationsResult = {
   applied: string[];
   skipped: string[];

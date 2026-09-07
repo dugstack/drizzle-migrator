@@ -26,4 +26,17 @@ describe("typed sqlFiles contract (smoke)", () => {
 
     expectTypeOf(migration.sqlFiles).toEqualTypeOf<readonly []>();
   });
+
+  it("restricts runSqlFile to the declared file names", () => {
+    const migration = defineMigration({
+      version: "0.0.3",
+      name: "smoke-params",
+      sqlFiles: ["0003_a.sql", "0003_b.sql"],
+      async up(ctx) {
+        expectTypeOf(ctx.runSqlFile).parameter(0).toEqualTypeOf<"0003_a.sql" | "0003_b.sql">();
+      },
+    });
+
+    expectTypeOf(migration.sqlFiles).toEqualTypeOf<readonly ["0003_a.sql", "0003_b.sql"]>();
+  });
 });

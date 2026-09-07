@@ -20,3 +20,10 @@ export type AuditLogEntry = {
   payload?: unknown;
   detail?: string | null;
 };
+
+export type RecentLogRow = {
+  at: string;
+  kind: string;
+  version: string | null;
+  detail: string | null;
+};
