@@ -1,0 +1,28 @@
+# PLACEHOLDER — INTENTIONALLY NON-FUNCTIONAL. DO NOT WIRE UP YET.
+#
+# This release pipeline is NOT active. The `if: false` guard below means the job never runs.
+# It will be enabled in Milestone 6 (plan §11) once all of the following exist:
+#
+#   1. An NPM_TOKEN repository secret (automation token for the @yourorg scope).
+#   2. The changesets bot / "Version Packages" PR flow set up on this repository.
+#   3. `id-token: write` permission granted so `npm publish --provenance` can sign.
+#
+# Publishing rules from the plan (§3):
+#   - Versioning via changesets at the repo root.
+#   - `npm publish --access public --provenance` runs from packages/drizzle-migrator ONLY.
+#
+# Nothing in this file publishes anything today.
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Not configured
+        run: echo "Release pipeline not configured yet — needs NPM_TOKEN, changesets setup, and provenance permissions (plan §11 Milestone 6)."

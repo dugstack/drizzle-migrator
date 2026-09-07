@@ -1,0 +1,6 @@
+{
+  "name": "@yourorg/drizzle-migrator-docs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reserved workspace slot for the future docs website (Astro + Starlight). Intentionally empty in v1 — see plan §2 and §3."
+}
