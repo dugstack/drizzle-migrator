@@ -13,7 +13,7 @@ subpath exports: `/pg`, `/mysql`, `/sqlite`.
 
 ## Status
 
-**Milestone 3 — pg adapter.** The core engine, registry validation, and SQL splitting are
-implemented; the `/pg` dialect (tracking-table DDL + drift assertion, advisory locking,
-node-postgres adapter) is wired into the `/pg` entry and covered by testcontainers integration
-tests (CI runs them; locally they skip when Docker is unreachable). CLI and commands are next.
+**Milestone 4 — CLI + config.** The core engine, `/pg` adapter, `defineConfig` validation, and
+the CLI factory are implemented: `migrate` (`--dry-run`), `adopt`, `status` (`--json`),
+`validate`, and per-command `connect` lifecycle. `generate` (prompts, flags, scaffolding) and
+the bundled skill content land next.

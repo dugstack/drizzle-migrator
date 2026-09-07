@@ -38,7 +38,7 @@ export type StatusOptions<TDb = unknown, TTx = unknown> = {
   migrations: readonly Migration[];
 };
 
-function errorDetail(error: unknown): string {
+export function errorDetail(error: unknown): string {
   if (error instanceof Error) {
     return error.stack ?? error.message;
   }

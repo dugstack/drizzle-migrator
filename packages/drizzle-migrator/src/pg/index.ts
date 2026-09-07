@@ -1,6 +1,6 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { createMigrationCli } from "../core/cli.js";
-import type { CreateMigrationCliOptions } from "../core/cli.js";
+import type { CreateMigrationCliOptions as CoreCreateMigrationCliOptions } from "../core/cli.js";
+import { createMigrationCli as createCoreMigrationCli } from "../core/cli.js";
 import {
   adoptMigrations as adoptCore,
   runMigrations as runCore,
@@ -17,8 +17,6 @@ import type {
 import { type PgDatabase, type PgTransaction, createPgAdapter } from "./adapter.js";
 
 export * from "../core/index.js";
-export { createMigrationCli };
-export type { CreateMigrationCliOptions };
 export type { GenerateMigrationEntryOptions, GenerateResult };
 export type { PgDatabase, PgTransaction };
 
@@ -55,6 +53,21 @@ export async function adoptMigrations(options: AdoptMigrationsOptions): Promise<
 
 export async function getStatus(options: GetStatusOptions): Promise<StatusReport> {
   return statusCore({ ...options, adapter: createPgAdapter() });
+}
+
+export type CreateMigrationCliOptions = {
+  config: MigratorConfig;
+  migrations: Migration[];
+  connect: () => Promise<{ db: NodePgDatabase<Record<string, never>>; close: () => Promise<void> }>;
+};
+
+export async function createMigrationCli(options: CreateMigrationCliOptions): Promise<void> {
+  return createCoreMigrationCli({
+    adapter: createPgAdapter(),
+    config: options.config,
+    migrations: options.migrations,
+    connect: options.connect,
+  } satisfies CoreCreateMigrationCliOptions<PgDatabase, PgTransaction>);
 }
 
 export async function generateMigrationEntry(
