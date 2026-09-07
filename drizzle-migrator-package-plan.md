@@ -82,7 +82,9 @@ drizzle-migrator/                  # repo root — private, never published
     release.yml                    # changesets version + npm publish --provenance
   apps/
     docs/                          # RESERVED workspace slot — not built in v1 (§2).
-      package.json                 # When built: Astro + Starlight. Exists so the "website ASAP"
+      package.json                 # Private. Name: "@yourorg/drizzle-migrator-docs"
+                                   # (placeholder scope, same find-and-replace as the lib).
+                                   # When built: Astro + Starlight. Exists so the "website ASAP"
                                    # flip is scaffolding, not restructuring.
   packages/
     drizzle-migrator/              # THE published package — everything below lives here
@@ -262,8 +264,9 @@ export const migrations = [migration_v0_0_1, migration_v0_0_2, migration_v0_0_3]
 
 **Type-level contract (must be locked with `expectTypeOf` tests):**
 
-- `defineMigration<TFiles extends readonly string[]>(migration)` infers **literal types** from the
-  `sqlFiles` array literal.
+- `defineMigration<const TFiles extends readonly string[]>(migration)` uses a **const type
+  parameter** (TS 5.0+) so literal types are inferred from the `sqlFiles` array literal *without*
+  requiring `as const` at every call site.
 - `MigrationContext<TFiles>` exposes `runSqlFile(file: TFiles[number], range?: RunSqlFileRange)`.
 - If `sqlFiles` is omitted, `runSqlFile` accepts `never` — running a file requires declaring it.
 - `ctx.tx` is the drizzle transaction handle; `ctx.execute(rawSql)` runs one raw statement.
@@ -484,7 +487,9 @@ export const migratorConfig = defineConfig({
 defineMigration<TFiles extends readonly string[]>(migration: MigrationInput<TFiles>): Migration<TFiles>;
 defineConfig(config: MigratorConfigInput): MigratorConfig; // re-exported for typing convenience
 // types: Migration, MigrationContext<TFiles>, RunSqlFileRange, MigratorConfig,
-//        RunMigrationsResult, AdoptResult, StatusReport, MigratorLogger, AuditLogEntry
+// types: Migration, MigrationContext<TFiles>, RunSqlFileRange, MigratorConfig,
+//        RunMigrationsResult, AdoptResult, StatusReport, GenerateResult, MigratorLogger,
+//        AuditLogEntry
 ```
 
 ### `@yourorg/drizzle-migrator/pg` (v1 reference dialect)
@@ -578,6 +583,16 @@ export const migration_v0_0_7 = defineMigration({
 8. Never overwrites an existing entry — a version whose folder `v<version>/` already exists is an
    error.
 
+```ts
+type GenerateResult = {
+  version: string;      // the scaffolded version, e.g. "0.0.7"
+  name: string;         // the migration name used
+  entryPath: string;    // path to the written entry, e.g. "<migrationsDir>/v0.0.7/index.ts"
+  sqlFiles: string[];   // the unapplied files the entry declares
+  registered: boolean;  // true: appended to <migrationsDir>/index.ts; false: snippet printed only
+};
+```
+
 ---
 
 ## 9. Dialect adapter seam (the contract `/pg` implements)
@@ -652,6 +667,10 @@ pg integration (testcontainers):
 - Skill sync: the bundled `SKILL.md`'s command and flag table matches the CLI dispatch table
   (parse both and diff — the skill drifting from the CLI is a bug).
 - Config validation: bad identifiers, missing `lockName`.
+- CI runs `build`, `lint`, `tsc --noEmit`, and tests. **`tsc --noEmit` is mandatory and never
+  optional**: vitest does not typecheck by default, so the `expectTypeOf` assertions in
+  `types.test.ts` (the typed-sqlFiles contract, §4.1) are enforced only by the typecheck step.
+  Dropping typecheck from CI silently disables the package's central type guarantee.
 - CI matrix: integration suite against ≥2 `drizzle-orm` minor versions; Node 20 + 22.
 
 ---

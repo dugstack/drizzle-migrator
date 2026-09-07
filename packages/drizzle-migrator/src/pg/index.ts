@@ -2,7 +2,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { createMigrationCli } from "../core/cli.js";
 import type { CreateMigrationCliOptions } from "../core/cli.js";
 import { generateMigrationEntry } from "../core/generate.js";
-import type { GenerateMigrationEntryOptions, GenerateResult } from "../core/generate.js";
+import type { GenerateMigrationEntryOptions } from "../core/generate.js";
 import type {
   AdoptResult,
   Migration,
@@ -15,7 +15,7 @@ export * from "../core/index.js";
 export { createMigrationCli };
 export type { CreateMigrationCliOptions };
 export { generateMigrationEntry };
-export type { GenerateMigrationEntryOptions, GenerateResult };
+export type { GenerateMigrationEntryOptions };
 
 export type RunMigrationsOptions = {
   db: NodePgDatabase<Record<string, never>>;

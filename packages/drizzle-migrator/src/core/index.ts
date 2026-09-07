@@ -16,4 +16,5 @@ export type {
 } from "./migration.js";
 export type { DialectAdapter } from "./adapter.js";
 export type { AuditLogEntry, EngineAuditEventKind } from "./audit.js";
+export type { GenerateResult } from "./generate.js";
 export type { AdoptResult, MigrationOrigin, RunMigrationsResult, StatusReport } from "./result.js";
