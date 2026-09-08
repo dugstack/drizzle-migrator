@@ -13,8 +13,8 @@ subpath exports: `/pg`, `/mysql`, `/sqlite`.
 
 ## Status
 
-**Milestone 5 — commands complete.** Engine, `/pg` adapter, config validation, and the full CLI
-are implemented: `migrate` (`--dry-run`), `adopt` (all §5 guards), `status` (`--json`),
-`validate`, and `generate` (interactive prompts, `--version/--name/--yes/--register`, canonical
-named exports, fully specified ESM registry imports). Next: hardening — README, the bundled
-agent skill, changesets, publish provenance.
+**Milestone 6 — hardening complete.** All five CLI commands, the `/pg` adapter, the full
+consumer README, and the bundled agent skill (`skills/drizzle-migrator/SKILL.md`, test-synced
+against the CLI dispatch table) are in place; changesets and the provenance release pipeline are
+wired but gated off until the real npm scope and `NPM_TOKEN` exist. Publishing is intentionally
+not possible until then.

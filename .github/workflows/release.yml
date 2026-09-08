@@ -1,17 +1,16 @@
-# PLACEHOLDER — INTENTIONALLY NON-FUNCTIONAL. DO NOT WIRE UP YET.
+# RELEASE PIPELINE — GATED OFF. Nothing here publishes anything while `if: false` is set.
 #
-# This release pipeline is NOT active. The `if: false` guard below means the job never runs.
-# It will be enabled in Milestone 6 (plan §11) once all of the following exist:
+# This is the intended changesets + provenance flow per plan §3 / §11 (Milestone 6). Enable it
+# ONLY after all of the following exist:
 #
-#   1. An NPM_TOKEN repository secret (automation token for the @yourorg scope).
-#   2. The changesets bot / "Version Packages" PR flow set up on this repository.
-#   3. `id-token: write` permission granted so `npm publish --provenance` can sign.
+#   1. The real npm scope replaces the @yourorg placeholder everywhere (plan header).
+#   2. An NPM_TOKEN repository secret (automation token with publish rights for the scope).
+#   3. The changesets "Version Packages" PR flow (changesets/action, wired below).
+#   4. For the 0.1.0 alpha specifically: add `--tag alpha` to the publish command (or publish
+#      the tagged version manually) so the alpha does not become `latest`.
 #
-# Publishing rules from the plan (§3):
-#   - Versioning via changesets at the repo root.
-#   - `npm publish --access public --provenance` runs from packages/drizzle-migrator ONLY.
-#
-# Nothing in this file publishes anything today.
+# Publishing rules from the plan: versioning via changesets at the repo root; `npm publish
+# --access public --provenance` runs from packages/drizzle-migrator ONLY.
 
 name: Release
 
@@ -19,10 +18,39 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+  id-token: write
+
 jobs:
   release:
     if: false
     runs-on: ubuntu-latest
     steps:
-      - name: Not configured
-        run: echo "Release pipeline not configured yet — needs NPM_TOKEN, changesets setup, and provenance permissions (plan §11 Milestone 6)."
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm -r build
+
+      - name: Version or publish
+        uses: changesets/action@v1
+        with:
+          version: pnpm changeset version
+          publish: pnpm --filter @yourorg/drizzle-migrator publish --access public --provenance
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

@@ -13,7 +13,9 @@
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "changeset": "changeset"
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
+    "changeset:publish": "pnpm --filter @yourorg/drizzle-migrator publish --access public --provenance"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
