@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -20,6 +20,7 @@ type CliEnv = {
   closed: boolean;
   connectCalls: number;
   sqlDir: string;
+  migrationsDir: string;
   logger: ReturnType<typeof createFakeLogger>;
   config: ReturnType<typeof defineConfig>;
   connect: () => Promise<{ db: FakeDatabase; close: () => Promise<void> }>;
@@ -53,6 +54,7 @@ async function setupCliEnv(options: CliEnvOptions = {}): Promise<CliEnv> {
     closed: false,
     connectCalls: 0,
     sqlDir,
+    migrationsDir,
     logger,
     config: defineConfig({ sqlDir, migrationsDir, lockName: "cli:test:lock", logger }),
     connect: async () => {
@@ -146,7 +148,11 @@ describe("createMigrationCli", () => {
   beforeEach(async () => {
     process.exitCode = 0;
     env = await setupCliEnv({
-      sqlFiles: { "0001_a.sql": TWO_STATEMENTS, "0002_b.sql": "CREATE TABLE c (z int);" },
+      sqlFiles: {
+        "0001_a.sql": TWO_STATEMENTS,
+        "0002_b.sql": "CREATE TABLE c (z int);",
+        "0003_c.sql": "CREATE TABLE c3 (id int);",
+      },
       versions: ["0.0.1", "0.0.2"],
     });
   });
@@ -241,11 +247,12 @@ describe("createMigrationCli", () => {
     expect(env.closed).toBe(true);
   });
 
-  it("generate is dispatched but not implemented until Milestone 5", async () => {
+  it("generate fails with exit 1 on a version collision", async () => {
+    await runCli(env, ["generate", "--yes"]);
     await runCli(env, ["generate", "--yes"]);
 
     expect(process.exitCode).toBe(1);
-    expect(env.logger.lines.join("\n")).toContain("TODO: implement in Milestone 5");
+    expect(env.logger.lines.join("\n")).toContain("already exists");
   });
 
   it("unknown commands exit 1 with usage", async () => {
@@ -280,6 +287,18 @@ describe("createMigrationCli", () => {
     await runCli(env, ["adopt", "--from=0.0.1", "--confirm-database=other_db"]);
     expect(process.exitCode).toBe(1);
     expect(env.db.versions).toHaveLength(0);
+  });
+
+  it("generate --yes scaffolds the next version without prompts and prints the snippet", async () => {
+    await runCli(env, ["generate", "--yes"]);
+
+    expect(process.exitCode).toBe(0);
+    const content = await readFile(join(env.migrationsDir, "v0.0.3", "index.ts"), "utf8");
+    expect(content).toContain("export const migration_v0_0_3 = defineMigration({");
+    expect(content).toContain('sqlFiles: ["0003_c.sql"],');
+    expect(env.logger.lines.join("\n")).toContain(
+      'import { migration_v0_0_3 } from "./v0.0.3/index.js";',
+    );
   });
 
   it("exit code is 1 with the error detail when the engine throws mid-run", async () => {

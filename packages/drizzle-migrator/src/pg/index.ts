@@ -70,8 +70,4 @@ export async function createMigrationCli(options: CreateMigrationCliOptions): Pr
   } satisfies CoreCreateMigrationCliOptions<PgDatabase, PgTransaction>);
 }
 
-export async function generateMigrationEntry(
-  _options: GenerateMigrationEntryOptions,
-): Promise<GenerateResult> {
-  throw new Error("TODO: implement in Milestone 5 (generate command)");
-}
+export { generateMigrationEntry } from "../core/generate.js";

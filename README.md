@@ -13,7 +13,8 @@ subpath exports: `/pg`, `/mysql`, `/sqlite`.
 
 ## Status
 
-**Milestone 4 — CLI + config.** The core engine, `/pg` adapter, `defineConfig` validation, and
-the CLI factory are implemented: `migrate` (`--dry-run`), `adopt`, `status` (`--json`),
-`validate`, and per-command `connect` lifecycle. `generate` (prompts, flags, scaffolding) and
-the bundled skill content land next.
+**Milestone 5 — commands complete.** Engine, `/pg` adapter, config validation, and the full CLI
+are implemented: `migrate` (`--dry-run`), `adopt` (all §5 guards), `status` (`--json`),
+`validate`, and `generate` (interactive prompts, `--version/--name/--yes/--register`, canonical
+named exports, fully specified ESM registry imports). Next: hardening — README, the bundled
+agent skill, changesets, publish provenance.
