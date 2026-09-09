@@ -85,7 +85,7 @@ function renderEntry(version: string, name: string, files: readonly string[]): s
     .map((file) => `    await ctx.runSqlFile(${JSON.stringify(file)});`)
     .join("\n");
   const fileList = files.map((file) => JSON.stringify(file)).join(", ");
-  return `import { defineMigration } from "@yourorg/drizzle-migrator";
+  return `import { defineMigration } from "@dugstack/drizzle-migrator";
 
 export const ${exportName} = defineMigration({
   version: ${JSON.stringify(version)},

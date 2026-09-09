@@ -1,7 +1,7 @@
-# `@yourorg/drizzle-migrator`
+# `@dugstack/drizzle-migrator`
 
-> **Placeholder scope notice.** `@yourorg` is a placeholder npm scope. Find-and-replace it with
-> the real scope before publishing. The same placeholder appears throughout the plan and code.
+> **Scope notice.** The npm scope for this package is `@dugstack`. The same scope appears
+> throughout the plan and code.
 
 A standalone, config-driven database migration orchestrator for [Drizzle ORM](https://orm.drizzle.team)
 projects. The drizzle client is injected by the consumer; dialect-specific behavior lives behind

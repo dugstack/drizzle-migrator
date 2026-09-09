@@ -92,7 +92,7 @@ describe("generateMigrationEntry", () => {
     expect(result.entryPath).toBe(join(env.migrationsDir, "v0.0.7", "index.ts"));
 
     const content = await readFile(result.entryPath, "utf8");
-    expect(content).toContain('import { defineMigration } from "@yourorg/drizzle-migrator";');
+    expect(content).toContain('import { defineMigration } from "@dugstack/drizzle-migrator";');
     expect(content).toContain("export const migration_v0_0_7 = defineMigration({");
     expect(content).toContain('version: "0.0.7",');
     expect(content).toContain('name: "pending-migration",');

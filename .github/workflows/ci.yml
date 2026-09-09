@@ -35,7 +35,7 @@ jobs:
 
       - name: Pin lowest supported drizzle-orm (peer-range matrix)
         if: matrix.drizzle-orm != ''
-        run: pnpm --filter @yourorg/drizzle-migrator add drizzle-orm@${{ matrix.drizzle-orm }}
+        run: pnpm --filter @dugstack/drizzle-migrator add drizzle-orm@${{ matrix.drizzle-orm }}
 
       - name: Build
         run: pnpm -r build

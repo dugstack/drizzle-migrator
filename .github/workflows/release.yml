@@ -3,7 +3,7 @@
 # This is the intended changesets + provenance flow per plan §3 / §11 (Milestone 6). Enable it
 # ONLY after all of the following exist:
 #
-#   1. The real npm scope replaces the @yourorg placeholder everywhere (plan header).
+#   1. The npm scope is set (@dugstack). Confirm it is the final scope before enabling.
 #   2. An NPM_TOKEN repository secret (automation token with publish rights for the scope).
 #   3. The changesets "Version Packages" PR flow (changesets/action, wired below).
 #   4. For the 0.1.0 alpha specifically: add `--tag alpha` to the publish command (or publish
@@ -49,7 +49,7 @@ jobs:
         uses: changesets/action@v1
         with:
           version: pnpm changeset version
-          publish: pnpm --filter @yourorg/drizzle-migrator publish --access public --provenance
+          publish: pnpm --filter @dugstack/drizzle-migrator publish --access public --provenance
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

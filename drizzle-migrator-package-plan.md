@@ -1,7 +1,6 @@
-# PLAN: `@yourorg/drizzle-migrator`
+# PLAN: `@dugstack/drizzle-migrator`
 
-> **Placeholder scope notice.** `@yourorg/drizzle-migrator` is a placeholder. Find-and-replace
-> `@yourorg` with the real npm scope before publishing. The same placeholder appears in code
+> **Scope notice.** The npm scope for this package is `@dugstack` (decided). It appears in code
 > samples, docs, and test fixtures throughout this plan.
 
 A standalone, config-driven database migration orchestrator for [Drizzle ORM](https://orm.drizzle.team)
@@ -82,13 +81,13 @@ drizzle-migrator/                  # repo root — private, never published
     release.yml                    # changesets version + npm publish --provenance
   apps/
     docs/                          # RESERVED workspace slot — not built in v1 (§2).
-      package.json                 # Private. Name: "@yourorg/drizzle-migrator-docs"
-                                   # (placeholder scope, same find-and-replace as the lib).
+      package.json                 # Private. Name: "@dugstack/drizzle-migrator-docs"
+                                   # (same @dugstack scope as the lib).
                                    # When built: Astro + Starlight. Exists so the "website ASAP"
                                    # flip is scaffolding, not restructuring.
   packages/
     drizzle-migrator/              # THE published package — everything below lives here
-      package.json                 # @yourorg/drizzle-migrator (essentials below)
+      package.json                 # @dugstack/drizzle-migrator (essentials below)
       tsconfig.json
       vitest.config.ts
       skills/
@@ -129,7 +128,7 @@ drizzle-migrator/                  # repo root — private, never published
 
 ```jsonc
 {
-  "name": "@yourorg/drizzle-migrator",
+  "name": "@dugstack/drizzle-migrator",
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
@@ -236,7 +235,7 @@ app/src/db/migrator/versions/
 
 ```ts
 // app: src/db/migrator/versions/v0.0.3/index.ts
-import { defineMigration } from "@yourorg/drizzle-migrator";
+import { defineMigration } from "@dugstack/drizzle-migrator";
 
 export const migration_v0_0_3 = defineMigration({
   version: "0.0.3",
@@ -454,7 +453,7 @@ A normal TS module owned by the consuming app, imported by its bin script:
 
 ```ts
 // app: src/db/migrator.config.ts
-import { defineConfig } from "@yourorg/drizzle-migrator/pg";
+import { defineConfig } from "@dugstack/drizzle-migrator/pg";
 
 export const migratorConfig = defineConfig({
   sqlDir: "./drizzle",            // drizzle-kit SQL output folder (default "./drizzle")
@@ -481,7 +480,7 @@ export const migratorConfig = defineConfig({
 
 ## 7. Public API surface
 
-### `@yourorg/drizzle-migrator` (core, dialect-free)
+### `@dugstack/drizzle-migrator` (core, dialect-free)
 
 ```ts
 defineMigration<TFiles extends readonly string[]>(migration: MigrationInput<TFiles>): Migration<TFiles>;
@@ -492,7 +491,7 @@ defineConfig(config: MigratorConfigInput): MigratorConfig; // re-exported for ty
 //        AuditLogEntry
 ```
 
-### `@yourorg/drizzle-migrator/pg` (v1 reference dialect)
+### `@dugstack/drizzle-migrator/pg` (v1 reference dialect)
 
 ```ts
 // All of the below bind the pg adapter. `db` is always injected by the consumer.
@@ -559,7 +558,7 @@ over a pool.
 
 ```ts
 // app: src/db/migrator/versions/v0.0.7/index.ts
-import { defineMigration } from "@yourorg/drizzle-migrator";
+import { defineMigration } from "@dugstack/drizzle-migrator";
 
 export const migration_v0_0_7 = defineMigration({
   version: "0.0.7",
@@ -701,7 +700,7 @@ pg integration (testcontainers):
 - [ ] The repo is a pnpm-workspace monorepo: private root, `packages/drizzle-migrator` as the only
       publishable unit, `apps/docs` reserved (empty, private), CI path-filtered to the package,
       publish runs from the package folder with provenance.
-- [ ] `npm i @yourorg/drizzle-migrator pg drizzle-orm` + a ~20-line bin script is the entire
+- [ ] `npm i @dugstack/drizzle-migrator pg drizzle-orm` + a ~20-line bin script is the entire
       consumer setup; no other wiring.
 - [ ] One config file controls sqlDir, migrationsDir, schema, table names, lockName, timeouts,
       logger. No hardcoded "gamersmetro" strings anywhere in `src/`.
@@ -762,7 +761,7 @@ it is treated as part of the library's public surface, with the same care as the
   via `files: ["dist", "skills"]`.
 - The skill directory is named `drizzle-migrator` (not `db-migration`) so it never collides with
   an app's own database skill when installed alongside it.
-- README documents the install story: `npx skills add @yourorg/drizzle-migrator` where such
+- README documents the install story: `npx skills add @dugstack/drizzle-migrator` where such
   installers exist, or a manual copy of `skills/drizzle-migrator/` into the agent's skills
   directory (`.claude/skills/`, `.agents/skills/`, etc.). The tarball path is the canonical
   source any installer can fetch from.

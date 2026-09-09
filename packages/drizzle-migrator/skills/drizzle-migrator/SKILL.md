@@ -1,6 +1,6 @@
 ---
 name: drizzle-migrator
-description: Operating manual for @yourorg/drizzle-migrator — how AI agents add, register, run, verify, and adopt Drizzle ORM migrations safely. Read this before touching any migration files.
+description: Operating manual for @dugstack/drizzle-migrator — how AI agents add, register, run, verify, and adopt Drizzle ORM migrations safely. Read this before touching any migration files.
 ---
 
 # drizzle-migrator — agent operating manual
@@ -48,7 +48,7 @@ Before touching migrations, read, in order:
 
 ```ts
 // app: src/db/migrator/versions/v0.0.3/index.ts
-import { defineMigration } from "@yourorg/drizzle-migrator";
+import { defineMigration } from "@dugstack/drizzle-migrator";
 
 export const migration_v0_0_3 = defineMigration({
   version: "0.0.3",

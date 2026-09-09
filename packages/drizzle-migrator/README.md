@@ -1,7 +1,7 @@
-# `@yourorg/drizzle-migrator`
+# `@dugstack/drizzle-migrator`
 
-> **Placeholder scope notice.** `@yourorg` is a placeholder npm scope — find-and-replace it with
-> the real scope before publishing. The same placeholder appears throughout the docs.
+> **Scope notice.** The npm scope for this package is `@dugstack` — it appears throughout the
+> docs, examples, and the generated migration entries.
 
 A standalone, config-driven database migration orchestrator for [Drizzle ORM](https://orm.drizzle.team)
 projects. The drizzle client is injected by the consumer; dialect-specific behavior lives behind
@@ -37,7 +37,7 @@ This package fixes all four:
 ## Install
 
 ```sh
-npm i @yourorg/drizzle-migrator drizzle-orm pg
+npm i @dugstack/drizzle-migrator drizzle-orm pg
 ```
 
 The package has zero runtime dependencies; `drizzle-orm` and `pg` are peer dependencies.
@@ -49,7 +49,7 @@ tables, migration patterns, operational rules, and verification SQL. Install it 
 can read it:
 
 ```sh
-npx skills add @yourorg/drizzle-migrator
+npx skills add @dugstack/drizzle-migrator
 ```
 
 or copy `skills/drizzle-migrator/` into the agent's skills directory (`.claude/skills/`,
@@ -61,7 +61,7 @@ One config file, one bin script — that is the entire consumer setup.
 
 ```ts
 // app: src/db/migrator.config.ts
-import { defineConfig } from "@yourorg/drizzle-migrator/pg";
+import { defineConfig } from "@dugstack/drizzle-migrator/pg";
 
 export const migratorConfig = defineConfig({
   sqlDir: "./drizzle",            // drizzle-kit SQL output folder (default "./drizzle")
@@ -81,7 +81,7 @@ export const migratorConfig = defineConfig({
 // app: scripts/migrate.ts — ~20 lines, the whole wiring
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
-import { createMigrationCli } from "@yourorg/drizzle-migrator/pg";
+import { createMigrationCli } from "@dugstack/drizzle-migrator/pg";
 import { migratorConfig } from "../src/db/migrator.config.js";
 import { migrations } from "../src/db/migrator/versions/index.js";
 
@@ -118,7 +118,7 @@ app/src/db/migrator/versions/
 
 ```ts
 // v0.0.3/index.ts — canonical named export: migration_v<major>_<minor>_<patch>
-import { defineMigration } from "@yourorg/drizzle-migrator";
+import { defineMigration } from "@dugstack/drizzle-migrator";
 
 export const migration_v0_0_3 = defineMigration({
   version: "0.0.3",
@@ -255,12 +255,12 @@ LIMIT 20;
 
 ## Dialects
 
-- `@yourorg/drizzle-migrator` — core: `defineMigration`, `defineConfig`, public types.
-- `@yourorg/drizzle-migrator/pg` — v1 reference dialect (tracking DDL + drift assertion,
+- `@dugstack/drizzle-migrator` — core: `defineMigration`, `defineConfig`, public types.
+- `@dugstack/drizzle-migrator/pg` — v1 reference dialect (tracking DDL + drift assertion,
   `pg_try_advisory_lock(hashtext(...))` locking, node-postgres adapter) plus the bound
   `runMigrations` / `adoptMigrations` / `getStatus` / `generateMigrationEntry` /
   `createMigrationCli`.
-- `@yourorg/drizzle-migrator/mysql`, `/sqlite` — stubs that throw `not implemented in v1`.
+- `@dugstack/drizzle-migrator/mysql`, `/sqlite` — stubs that throw `not implemented in v1`.
 
 New dialects implement the `DialectAdapter` interface (the entire seam: identifier quoting,
 database name, locking, tracking-table bootstrap + drift assertion, version/log reads and

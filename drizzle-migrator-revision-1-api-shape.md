@@ -17,14 +17,14 @@ revision only redirects the API shape.
 ## 1. What changed and why
 
 The base plan had consumers importing commands directly from the dialect subpath
-(`runMigrations` from `@yourorg/drizzle-migrator/pg`). **Decision (superseding):** the consumer
+(`runMigrations` from `@dugstack/drizzle-migrator/pg`). **Decision (superseding):** the consumer
 initializes a core factory with a dialect token, then talks only to the returned `Migrator`
 instance — the Knex/TypeORM-style shape:
 
 ```ts
 // app: bin/migrate.ts — the ONLY file that knows the dialect
-import { createMigrator, defineConfig } from "@yourorg/drizzle-migrator";
-import { pgDialect } from "@yourorg/drizzle-migrator/pg";
+import { createMigrator, defineConfig } from "@dugstack/drizzle-migrator";
+import { pgDialect } from "@dugstack/drizzle-migrator/pg";
 import { migrations } from "../db/migrator/versions/index.js";
 
 const migrator = createMigrator({
@@ -41,7 +41,7 @@ await migrator.runMigrations({ db });
 
 ```ts
 // app: migration files — UNCHANGED, still dialect-free, still import from core
-import { defineMigration } from "@yourorg/drizzle-migrator";
+import { defineMigration } from "@dugstack/drizzle-migrator";
 
 export const migration_v0_0_3 = defineMigration({ version: "0.0.3", /* … */ });
 ```
@@ -142,10 +142,10 @@ Rules for stubs:
 
 | module | exports |
 | --- | --- |
-| `@yourorg/drizzle-migrator` | `createMigrator`, `Migrator`, `defineMigration`, `defineConfig`, types: `Migration`, `MigrationContext<TFiles>`, `RunSqlFileRange`, `MigratorConfig`, `RunMigrationsResult`, `AdoptResult`, `StatusReport`, `GenerateResult`, `ValidateResult`, `MigratorLogger`, `AuditLogEntry` |
-| `@yourorg/drizzle-migrator/pg` | `pgDialect`, `PgDialect` |
-| `@yourorg/drizzle-migrator/mysql` | `mysqlDialect`, `MysqlDialect` |
-| `@yourorg/drizzle-migrator/sqlite` | `sqliteDialect`, `SqliteDialect` |
+| `@dugstack/drizzle-migrator` | `createMigrator`, `Migrator`, `defineMigration`, `defineConfig`, types: `Migration`, `MigrationContext<TFiles>`, `RunSqlFileRange`, `MigratorConfig`, `RunMigrationsResult`, `AdoptResult`, `StatusReport`, `GenerateResult`, `ValidateResult`, `MigratorLogger`, `AuditLogEntry` |
+| `@dugstack/drizzle-migrator/pg` | `pgDialect`, `PgDialect` |
+| `@dugstack/drizzle-migrator/mysql` | `mysqlDialect`, `MysqlDialect` |
+| `@dugstack/drizzle-migrator/sqlite` | `sqliteDialect`, `SqliteDialect` |
 
 Nothing else. The engine functions (`runMigrations`, `adoptMigrations`, `getStatus`,
 `generateMigrationEntry`, `createMigrationCli`) become **internal** to `src/core/` — no longer
