@@ -36,11 +36,28 @@ This package fixes all four:
 
 ## Install
 
-```sh
-npm i @dugstack/drizzle-migrator drizzle-orm pg
-```
+Two ways to consume the migrator:
 
-The package has zero runtime dependencies; `drizzle-orm` and `pg` are peer dependencies.
+- **CLI executable** — install both packages and skip the bin script entirely:
+
+  ```sh
+  npm i @dugstack/drizzle-migrator @dugstack/drizzle-migrator-cli
+  ```
+
+  The companion package ships the `migrator` executable: it discovers your config, auto-discovers
+  migration folders, and owns the pg connection wiring (see
+  [Quick start — CLI executable](#quick-start--cli-executable) and the
+  [CLI README](../drizzle-migrator-cli/README.md)).
+
+- **Programmatic only** — install the core and wire your own bin script:
+
+  ```sh
+  npm i @dugstack/drizzle-migrator drizzle-orm pg
+  ```
+
+  The core package has zero runtime dependencies; `drizzle-orm` and `pg` are peer dependencies.
+  (The CLI package depends on `drizzle-orm`, `pg`, and `jiti` directly because it owns the
+  connection wiring and loads TypeScript config files.)
 
 ### Agent skill
 
@@ -55,7 +72,32 @@ npx skills add @dugstack/drizzle-migrator
 or copy `skills/drizzle-migrator/` into the agent's skills directory (`.claude/skills/`,
 `.agents/skills/`, …). The tarball path is the canonical source.
 
-## Quick start
+## Quick start — CLI executable
+
+One config file, zero bin scripts:
+
+```ts
+// drizzle-migrator.config.ts
+export default {
+  dialect: "postgres",
+  postgres: { connectionString: process.env.DATABASE_URL! },
+  migratorOutDir: "./src/db/migrator", // scanned for v<semver>/index.ts entries
+};
+```
+
+```sh
+pnpm drizzle-kit generate       # SQL files land in ./drizzle
+pnpm migrator generate --yes    # scaffolds v<next>/index.ts from unapplied SQL files
+pnpm migrator migrate           # applies pending migrations
+pnpm migrator status --json
+```
+
+Migration entries are auto-discovered from `<migratorOutDir>/v<semver>/index.ts` — no manual
+registry file. Command behavior, flags, and output are identical to the programmatic
+`createCli` (same dispatcher). Full reference: the
+[CLI package README](../drizzle-migrator-cli/README.md).
+
+## Quick start — programmatic core
 
 One config file, one bin script — that is the entire consumer setup.
 

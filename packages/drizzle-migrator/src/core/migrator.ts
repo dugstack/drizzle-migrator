@@ -29,6 +29,8 @@ export interface Migrator<TDb, _TTx> {
   }): Promise<GenerateResult>;
   createCli(options: {
     connect: () => Promise<{ db: TDb; close: () => Promise<void> }>;
+    /** Defaults to process.argv.slice(2); the CLI executable forwards its own argv. */
+    argv?: readonly string[];
   }): Promise<void>;
 }
 
@@ -71,8 +73,8 @@ export function createMigrator<D extends DialectAdapter<any, any>>(options: {
     },
     generateMigrationEntry: (generateOptions) =>
       generateMigrationEntry({ config, migrations, ...generateOptions }),
-    createCli: ({ connect }) =>
-      createMigrationCli({ adapter: dialect, config, migrations, connect }),
+    createCli: ({ connect, argv }) =>
+      createMigrationCli({ adapter: dialect, config, migrations, connect, argv }),
   };
 
   return migrator as D extends DialectAdapter<infer TDb, infer TTx> ? Migrator<TDb, TTx> : never;

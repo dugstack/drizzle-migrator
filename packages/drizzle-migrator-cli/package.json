@@ -1,0 +1,41 @@
+{
+  "name": "@dugstack/drizzle-migrator-cli",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "description": "Executable `migrator` command for @dugstack/drizzle-migrator: config discovery, migration auto-discovery, and Postgres connection wiring.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "migrator": "./dist/bin.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:integration": "vitest run --dir test --include 'pg.integration.test.ts'",
+    "lint": "biome check .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@dugstack/drizzle-migrator": "workspace:^",
+    "drizzle-orm": "^0.45.0",
+    "jiti": "^2.6.0",
+    "pg": "^8"
+  },
+  "devDependencies": {
+    "@testcontainers/postgresql": "^10",
+    "@types/node": "^22",
+    "@types/pg": "^8",
+    "tsup": "^8",
+    "typescript": "^5.7",
+    "vitest": "^3"
+  }
+}

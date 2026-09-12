@@ -6,7 +6,8 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": true
+    "ignoreUnknown": true,
+    "ignore": ["**/test/.tmp/**"]
   },
   "formatter": {
     "enabled": true,

@@ -123,6 +123,24 @@ drizzle-migrator/                  # repo root — private, never published
         generate.test.ts
         types.test.ts              # expectTypeOf guards for the typed sqlFiles contract
         skill-sync.test.ts         # SKILL.md command/flag table matches the CLI dispatch table
+    drizzle-migrator-cli/          # REVISION 2: the executable — config + entry discovery, pg wiring
+      package.json                 # @dugstack/drizzle-migrator-cli; bin: migrator -> ./dist/bin.js
+      src/
+        config.ts                  # dialect-discriminated CLI config + validation ("postgres" member)
+        discovery.ts               # config-file discovery + v<semver>/index.ts auto-discovery
+        drizzle-out.ts             # sqlDir resolution: drizzleOutDir > drizzle.config out > "./drizzle"
+        loader.ts                  # jiti-based TypeScript module loader (configs + entries)
+        connect.ts                 # pg.Client -> drizzle(client) wiring (one dedicated client per command)
+        usage.ts                   # usage table (test-synced against the core dispatch table)
+        run.ts                     # runCli: parse global flags, resolve, wire, forward to the core dispatcher
+        bin.ts                     # #!/usr/bin/env node executable entry
+      test/
+        config.test.ts             # postgres type requirements + connection-string validation
+        discovery.test.ts          # folder-naming validation + config path discovery
+        drizzle-out.test.ts        # manual vs drizzle-derived SQL directory
+        run.test.ts                # global flags + command forwarding to the core dispatcher
+        usage-sync.test.ts         # usage-table drift guard vs the core CLI dispatch table
+        pg.integration.test.ts     # full testcontainers path (migrate / status / generate)
 ```
 
 ### `package.json` essentials (lives at `packages/drizzle-migrator/package.json`)
@@ -174,8 +192,10 @@ Rules:
 anticipated to be needed ASAP if the package gains traction, and restructuring a popular repo
 mid-life is riskier than reserving the slot now. Rules:
 
-- The root is private tooling only — it never publishes. The single published unit remains
-  `packages/drizzle-migrator` (one version line, subpath exports).
+- The root is private tooling only — it never publishes. The published units are
+  `packages/drizzle-migrator` (one version line, subpath exports) and, since Revision 2, its
+  companion executable `packages/drizzle-migrator-cli` (§7 "CLI package"); the core remains the
+  single source of engine semantics.
 - `apps/docs/` exists as a **reserved, empty workspace** in v1 (see §2): only a minimal private
   `package.json`. When the website is built, it lands there as **Astro + Starlight** reading the
   README/plan content — no restructuring, no moves, instant flip.
@@ -529,6 +549,39 @@ over a pool.
 | `generate` | `--version= --name= --yes --register` | §8 |
 | `validate` | – | registry lint: versions, duplicate versions, duplicate sqlFiles, file existence; exit 1 with reasons |
 
+### CLI package (`@dugstack/drizzle-migrator-cli`, added by Revision 2)
+
+The companion executable packages the standard consumer wiring into a `migrator` bin command.
+The core programmatic API (`createMigrator({ dialect, config, migrations })`) is unchanged; the
+CLI:
+
+- discovers `drizzle-migrator.config.{ts,mts,cts,js,mjs,cjs}` in the cwd (`--config <path>`
+  overrides), loads it and the migration entries through **jiti** — configs and entries stay
+  normal TypeScript — and validates it through a `dialect`-discriminated config:
+
+  ```ts
+  export default defineConfig({
+    dialect: "postgres",
+    postgres: { connectionString: process.env.DATABASE_URL! }, // required when dialect is "postgres"
+    migratorOutDir: "./src/db/migrator",  // required; scanned for v<semver>/index.ts
+    drizzleOutDir: "./drizzle",           // optional; wins over the drizzle config's out
+    lockName: "myapp:migrator",           // optional; default "drizzle-migrator"
+  });
+  ```
+
+- resolves the SQL directory: `drizzleOutDir` → drizzle.config `out` → `"./drizzle"`;
+- auto-discovers migrations as `<migratorOutDir>/v<semver>/index.ts` — one migration export per
+  folder, folder name exactly `"v" + version`, unique versions, numeric sort — **no manual
+  registry file**;
+- owns the pg connection wiring (`pg.Client` → `drizzle(client)` → `pgDialect` →
+  `createMigrator`), one dedicated session-scoped client per command;
+- forwards the §7 command table byte-identically to the core dispatcher. The only core change is
+  additive: `Migrator.createCli` accepts an optional `argv` (default `process.argv.slice(2)`) so
+  the executable can forward its own argv.
+
+The CLI package's usage table is test-synced against the core dispatch table (the same mechanism
+as the skill sync).
+
 ---
 
 ## 8. The `generate` command (user-specified behavior)
@@ -711,6 +764,10 @@ pg integration (testcontainers):
 - [ ] `status --json`, `--dry-run`, and `generate --yes` all work as specified.
 - [ ] `/mysql` and `/sqlite` subpaths exist and throw informative errors; the adapter interface is
       documented enough to add them without touching the core.
+- [ ] The CLI package (`@dugstack/drizzle-migrator-cli`) builds the `migrator` executable with
+      config discovery, migration-folder auto-discovery, drizzle-out resolution, and pg wiring;
+      commands are forwarded to the core dispatcher unchanged and covered by a testcontainers
+      end-to-end test.
 - [ ] Zero runtime dependencies; peer deps proven by a 2-version CI matrix; ESM-only build with
       per-entry `.d.ts`.
 - [ ] Integration tests cover every bullet in §10 and pass locally and in CI.

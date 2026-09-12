@@ -9,8 +9,9 @@
 #   4. For the 0.1.0 alpha specifically: add `--tag alpha` to the publish command (or publish
 #      the tagged version manually) so the alpha does not become `latest`.
 #
-# Publishing rules from the plan: versioning via changesets at the repo root; `npm publish
-# --access public --provenance` runs from packages/drizzle-migrator ONLY.
+# Publishing rules from the plan: versioning via changesets at the repo root; `pnpm -r publish
+# --access public --provenance` publishes both @dugstack packages (private workspaces are
+# skipped automatically).
 
 name: Release
 
@@ -49,7 +50,7 @@ jobs:
         uses: changesets/action@v1
         with:
           version: pnpm changeset version
-          publish: pnpm --filter @dugstack/drizzle-migrator publish --access public --provenance
+          publish: pnpm -r publish --access public --provenance
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
