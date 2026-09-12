@@ -61,7 +61,7 @@ One config file, one bin script — that is the entire consumer setup.
 
 ```ts
 // app: src/db/migrator.config.ts
-import { defineConfig } from "@dugstack/drizzle-migrator/pg";
+import { defineConfig } from "@dugstack/drizzle-migrator";
 
 export const migratorConfig = defineConfig({
   sqlDir: "./drizzle",            // drizzle-kit SQL output folder (default "./drizzle")
@@ -81,13 +81,18 @@ export const migratorConfig = defineConfig({
 // app: scripts/migrate.ts — ~20 lines, the whole wiring
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
-import { createMigrationCli } from "@dugstack/drizzle-migrator/pg";
+import { createMigrator } from "@dugstack/drizzle-migrator";
+import { pgDialect } from "@dugstack/drizzle-migrator/pg";
 import { migratorConfig } from "../src/db/migrator.config.js";
 import { migrations } from "../src/db/migrator/versions/index.js";
 
-await createMigrationCli({
+const migrator = createMigrator({
+  dialect: pgDialect,
   config: migratorConfig,
   migrations,
+});
+
+await migrator.createCli({
   connect: async () => {
     const client = new Client({ connectionString: process.env.DATABASE_URL });
     await client.connect();
@@ -95,6 +100,9 @@ await createMigrationCli({
   },
 });
 ```
+
+For programmatic execution, call `await migrator.runMigrations({ db })`. Config, migrations, and
+dialect bind once during construction.
 
 Then: `node scripts/migrate.ts migrate`.
 
@@ -255,12 +263,17 @@ LIMIT 20;
 
 ## Dialects
 
-- `@dugstack/drizzle-migrator` — core: `defineMigration`, `defineConfig`, public types.
-- `@dugstack/drizzle-migrator/pg` — v1 reference dialect (tracking DDL + drift assertion,
-  `pg_try_advisory_lock(hashtext(...))` locking, node-postgres adapter) plus the bound
-  `runMigrations` / `adoptMigrations` / `getStatus` / `generateMigrationEntry` /
-  `createMigrationCli`.
-- `@dugstack/drizzle-migrator/mysql`, `/sqlite` — stubs that throw `not implemented in v1`.
+- `@dugstack/drizzle-migrator` — `createMigrator`, `Migrator`, `defineMigration`,
+  `defineConfig`, plus `Migration`, `MigrationContext`, `RunSqlFileRange`, `MigratorConfig`,
+  `RunMigrationsResult`, `AdoptResult`, `StatusReport`, `GenerateResult`, `ValidateResult`,
+  `MigratorLogger`, and `AuditLogEntry` types.
+- `@dugstack/drizzle-migrator/pg` — `pgDialect`, `PgDialect`.
+- `@dugstack/drizzle-migrator/mysql` — `mysqlDialect`, `MysqlDialect`.
+- `@dugstack/drizzle-migrator/sqlite` — `sqliteDialect`, `SqliteDialect`.
+
+Dialect tokens carry database types into `createMigrator`; passing a mismatched database handle to
+a bound migrator fails typechecking. Schema and tracking-table identifiers are validated through
+the selected dialect during `createMigrator` construction.
 
 New dialects implement the `DialectAdapter` interface (the entire seam: identifier quoting,
 database name, locking, tracking-table bootstrap + drift assertion, version/log reads and

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CLI_COMMANDS, createMigrationCli, parseArgv, redactFlags } from "../src/core/cli.js";
 import { type MigratorConfigInput, type MigratorLogger, defineConfig } from "../src/core/config.js";
-import { type Migration, defineMigration } from "../src/core/index.js";
+import { type Migration, createMigrator, defineMigration } from "../src/core/index.js";
 import {
   type FakeDatabase,
   createFakeAdapter,
@@ -332,16 +332,36 @@ describe("defineConfig validation", () => {
     );
   });
 
-  it("rejects non-identifier schema and table names, naming the field", () => {
-    expect(() => defineConfig({ lockName: "x", schema: "Migrations" })).toThrow(
-      /"schema" must be an identifier/,
-    );
+  it("validates schema and table names through the dialect", () => {
+    const dialect = createFakeAdapter(createFakeDatabase());
+    dialect.quoteIdentifier = (identifier) => {
+      if (!/^[a-z_][a-z0-9_]*$/.test(identifier)) {
+        throw new Error(`invalid identifier: ${identifier}`);
+      }
+      return `\"${identifier}\"`;
+    };
+
     expect(() =>
-      defineConfig({ lockName: "x", tables: { versions: "versions-1", logs: "logs" } }),
-    ).toThrow(/"tables\.versions" must be an identifier/);
-    expect(() => defineConfig({ lockName: "x", tables: { versions: "v", logs: "l;og" } })).toThrow(
-      /"tables\.logs" must be an identifier/,
-    );
+      createMigrator({
+        dialect,
+        config: defineConfig({ lockName: "x", schema: "Migrations" }),
+        migrations: [],
+      }),
+    ).toThrow(/invalid identifier: Migrations/);
+    expect(() =>
+      createMigrator({
+        dialect,
+        config: defineConfig({ lockName: "x", tables: { versions: "versions-1", logs: "logs" } }),
+        migrations: [],
+      }),
+    ).toThrow(/invalid identifier: versions-1/);
+    expect(() =>
+      createMigrator({
+        dialect,
+        config: defineConfig({ lockName: "x", tables: { versions: "v", logs: "l;og" } }),
+        migrations: [],
+      }),
+    ).toThrow(/invalid identifier: l;og/);
   });
 
   it("rejects URL-shaped paths and null bytes", () => {
@@ -366,8 +386,8 @@ describe("defineConfig validation", () => {
   });
 
   it("aggregates multiple violations into one error", () => {
-    expect(() => defineConfig({ lockName: "", schema: "Bad Schema", sqlDir: "http://x" })).toThrow(
-      /invalid migrator config:\n- "lockName".*- "sqlDir".*- "schema"/s,
+    expect(() => defineConfig({ lockName: "", sqlDir: "http://x" })).toThrow(
+      /invalid migrator config:\n- "lockName".*- "sqlDir"/s,
     );
   });
 });

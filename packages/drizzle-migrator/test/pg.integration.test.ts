@@ -8,44 +8,60 @@ import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { adoptMigrations, getStatus, runMigrations } from "../src/core/engine.js";
 import { type Migration, defineConfig, defineMigration } from "../src/core/index.js";
 import { type PgDatabase, createPgAdapter } from "../src/pg/adapter.js";
-import { adoptMigrations, getStatus, runMigrations } from "../src/pg/index.js";
+import { pgDialect } from "../src/pg/index.js";
 import { createTrackingTables } from "../src/pg/tables.js";
 import { createFakeLogger } from "./fake-adapter.js";
 
 const TIMEOUT = 120_000;
 const PG_IMAGE = "postgres:16-alpine";
 
-async function dockerReachable(): Promise<boolean> {
+async function resolveDockerHost(): Promise<string | null> {
   const host = process.env.DOCKER_HOST;
   if (host && !host.startsWith("unix://")) {
-    return true;
+    return host;
   }
-  const socketPath = host?.startsWith("unix://")
-    ? host.slice("unix://".length)
-    : "/var/run/docker.sock";
-  try {
-    await access(socketPath);
-  } catch {
-    return false;
+
+  const sockets = [
+    host?.slice("unix://".length),
+    "/var/run/docker.sock",
+    process.env.HOME ? `${process.env.HOME}/.docker/desktop/docker.sock` : undefined,
+  ].filter((socketPath): socketPath is string => socketPath !== undefined);
+
+  for (const socketPath of sockets) {
+    try {
+      await access(socketPath);
+      const reachable = await new Promise<boolean>((resolve) => {
+        const socket = netConnect({ path: socketPath });
+        socket.once("connect", () => {
+          socket.destroy();
+          resolve(true);
+        });
+        socket.once("error", () => resolve(false));
+        socket.setTimeout(2000);
+        socket.once("timeout", () => {
+          socket.destroy();
+          resolve(false);
+        });
+      });
+      if (reachable) {
+        return `unix://${socketPath}`;
+      }
+    } catch {
+      // Try the next standard Docker socket location.
+    }
   }
-  return new Promise<boolean>((resolve) => {
-    const socket = netConnect({ path: socketPath });
-    socket.once("connect", () => {
-      socket.destroy();
-      resolve(true);
-    });
-    socket.once("error", () => resolve(false));
-    socket.setTimeout(2000);
-    socket.once("timeout", () => {
-      socket.destroy();
-      resolve(false);
-    });
-  });
+  return null;
 }
 
-const dockerAvailable = await dockerReachable();
+const dockerHost = await resolveDockerHost();
+if (dockerHost) {
+  // Testcontainers reads DOCKER_HOST when creating its Docker client.
+  process.env.DOCKER_HOST = dockerHost;
+}
+const dockerAvailable = dockerHost !== null;
 if (!dockerAvailable) {
   console.warn(
     "[pg.integration] Docker is not reachable — skipping testcontainers integration tests (CI runs them with Docker).",
@@ -164,7 +180,12 @@ suite("pg integration (testcontainers)", () => {
         }),
       ];
 
-      const first = await runMigrations({ db: env.db, config: env.config, migrations });
+      const first = await runMigrations({
+        adapter: pgDialect,
+        db: env.db,
+        config: env.config,
+        migrations,
+      });
       expect(first.applied).toEqual(["0.0.1", "0.0.2"]);
 
       const userCount = await env.db.execute(sql`SELECT count(*)::int AS count FROM users`);
@@ -178,7 +199,12 @@ suite("pg integration (testcontainers)", () => {
       ]);
       expect(rows[0]?.appliedAt).toBeInstanceOf(Date);
 
-      const second = await runMigrations({ db: env.db, config: env.config, migrations });
+      const second = await runMigrations({
+        adapter: pgDialect,
+        db: env.db,
+        config: env.config,
+        migrations,
+      });
       expect(second).toEqual({ applied: [], skipped: ["0.0.1", "0.0.2"], dryRun: [] });
     },
     TIMEOUT,
@@ -225,8 +251,8 @@ suite("pg integration (testcontainers)", () => {
       ];
 
       const [first, second] = await Promise.all([
-        runMigrations({ db: env.db, config, migrations }),
-        runMigrations({ db: secondDrizzle, config, migrations }),
+        runMigrations({ adapter: pgDialect, db: env.db, config, migrations }),
+        runMigrations({ adapter: pgDialect, db: secondDrizzle, config, migrations }),
       ]);
 
       expect([first.applied.length, second.applied.length].sort()).toEqual([0, 2]);
@@ -251,7 +277,7 @@ suite("pg integration (testcontainers)", () => {
           },
         }),
       ];
-      await runMigrations({ db: env.db, config: env.config, migrations });
+      await runMigrations({ adapter: pgDialect, db: env.db, config: env.config, migrations });
 
       const adapter = createPgAdapter();
       await adapter.appendLog(env.db, env.config, {
@@ -262,7 +288,12 @@ suite("pg integration (testcontainers)", () => {
         payload: { name: "killed-run" },
       });
 
-      const report = await getStatus({ db: env.db, config: env.config, migrations });
+      const report = await getStatus({
+        adapter: pgDialect,
+        db: env.db,
+        config: env.config,
+        migrations,
+      });
       expect(report.currentVersion).toBe("0.0.1");
       expect(report.recentLogs).toContainEqual(
         expect.objectContaining({ kind: "run.started", version: "0.0.9" }),
@@ -295,7 +326,7 @@ suite("pg integration (testcontainers)", () => {
         }),
       ];
 
-      await runMigrations({ db: env.db, config: env.config, migrations });
+      await runMigrations({ adapter: pgDialect, db: env.db, config: env.config, migrations });
 
       const rows = await env.db.execute(sql`SELECT id, label FROM items ORDER BY id`);
       expect(rows.rows).toEqual([
@@ -304,7 +335,9 @@ suite("pg integration (testcontainers)", () => {
       ]);
       await expect(
         env.db.execute(sql`INSERT INTO items (id, label) VALUES (3, NULL)`),
-      ).rejects.toThrow(/null value/i);
+      ).rejects.toMatchObject({
+        cause: expect.objectContaining({ message: expect.stringMatching(/null value/i) }),
+      });
     },
     TIMEOUT,
   );
@@ -313,13 +346,13 @@ suite("pg integration (testcontainers)", () => {
     "fails the drift assertion when a column is added to the physical side only",
     async () => {
       const env = await freshDb("drift");
-      await runMigrations({ db: env.db, config: env.config, migrations: [] });
+      await runMigrations({ adapter: pgDialect, db: env.db, config: env.config, migrations: [] });
 
       await env.db.execute(
         sql`ALTER TABLE "migrations"."migration_versions" ADD COLUMN extra text`,
       );
       await expect(
-        runMigrations({ db: env.db, config: env.config, migrations: [] }),
+        runMigrations({ adapter: pgDialect, db: env.db, config: env.config, migrations: [] }),
       ).rejects.toThrow(
         /tracking table drift for migrations\.migration_versions.*undeclared columns \[extra\]/s,
       );
@@ -327,7 +360,7 @@ suite("pg integration (testcontainers)", () => {
       await env.db.execute(sql`ALTER TABLE "migrations"."migration_versions" DROP COLUMN extra`);
       await env.db.execute(sql`ALTER TABLE "migrations"."migration_versions" DROP COLUMN origin`);
       await expect(
-        runMigrations({ db: env.db, config: env.config, migrations: [] }),
+        runMigrations({ adapter: pgDialect, db: env.db, config: env.config, migrations: [] }),
       ).rejects.toThrow(/missing columns \[origin\]/s);
     },
     TIMEOUT,
@@ -353,6 +386,7 @@ suite("pg integration (testcontainers)", () => {
 
     function adopt(options: Partial<Parameters<typeof adoptMigrations>[0]> = {}) {
       return adoptMigrations({
+        adapter: pgDialect,
         db: env.db,
         config: env.config,
         migrations,
@@ -387,6 +421,8 @@ suite("pg integration (testcontainers)", () => {
     });
 
     it("adopts the requested range with origin adopted", async () => {
+      // Keep this success path independent from preceding guard-test side effects.
+      await env.db.execute(sql`CREATE TABLE IF NOT EXISTS preexisting (id int)`);
       const result = await adopt({ to: "0.0.2" });
       expect(result).toEqual({ adopted: ["0.0.1", "0.0.2"], notAdopted: ["0.0.3", "0.0.4"] });
 
@@ -434,8 +470,13 @@ suite("pg integration (testcontainers)", () => {
     "getStatus reports an empty, freshly-bootstrapped database",
     async () => {
       const env = await freshDb("status-empty");
-      await runMigrations({ db: env.db, config: env.config, migrations: [] });
-      const report = await getStatus({ db: env.db, config: env.config, migrations: [] });
+      await runMigrations({ adapter: pgDialect, db: env.db, config: env.config, migrations: [] });
+      const report = await getStatus({
+        adapter: pgDialect,
+        db: env.db,
+        config: env.config,
+        migrations: [],
+      });
       expect(report.currentVersion).toBeNull();
       expect(report.applied).toEqual([]);
       expect(report.pending).toEqual([]);

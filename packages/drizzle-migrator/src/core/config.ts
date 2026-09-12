@@ -1,4 +1,3 @@
-const IDENTIFIER_PATTERN = /^[a-z_][a-z0-9_]*$/;
 const URL_PATTERN = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
 
 export type MigratorLogger = {
@@ -56,17 +55,6 @@ function checkPath(field: string, value: string | undefined, errors: string[]): 
   }
 }
 
-function checkIdentifierField(field: string, value: string | undefined, errors: string[]): void {
-  if (value === undefined) {
-    return;
-  }
-  if (!IDENTIFIER_PATTERN.test(value)) {
-    errors.push(
-      `"${field}" must be an identifier matching ${IDENTIFIER_PATTERN.source}, got ${JSON.stringify(value)}`,
-    );
-  }
-}
-
 export function defineConfig(config: MigratorConfigInput): MigratorConfig {
   const errors: string[] = [];
 
@@ -75,10 +63,6 @@ export function defineConfig(config: MigratorConfigInput): MigratorConfig {
   }
   checkPath("sqlDir", config.sqlDir, errors);
   checkPath("migrationsDir", config.migrationsDir, errors);
-  checkIdentifierField("schema", config.schema, errors);
-  checkIdentifierField("tables.versions", config.tables?.versions, errors);
-  checkIdentifierField("tables.logs", config.tables?.logs, errors);
-
   if (config.logger !== undefined) {
     const logger = config.logger;
     if (typeof logger.info !== "function" || typeof logger.error !== "function") {

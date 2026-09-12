@@ -95,7 +95,8 @@ drizzle-migrator/                  # repo root — private, never published
           SKILL.md
       src/
         core/                      # dialect-agnostic engine — no pg imports allowed
-          index.ts                 # public exports: defineMigration, defineConfig, types
+          index.ts                 # public factory, migration/config definitions, public types
+          migrator.ts              # createMigrator factory + Migrator interface
           engine.ts                # runMigrations / adoptMigrations / getStatus orchestration
           migration.ts             # defineMigration + Migration/MigrationContext types
           registry.ts              # sort + validate (versions, sqlFiles uniqueness, file existence)
@@ -103,18 +104,18 @@ drizzle-migrator/                  # repo root — private, never published
           config.ts                # MigratorConfig type + defineConfig validation
           adapter.ts               # DialectAdapter interface (the dialect seam)
           audit.ts                 # audit event kinds + payload types
-          cli.ts                   # createMigrationCli factory: argv parsing + command dispatch
+          cli.ts                   # internal CLI dispatcher: argv parsing + command dispatch
           generate.ts              # generate command logic (scaffold entry files)
           result.ts                # RunMigrationsResult / AdoptResult / StatusReport types
         pg/                        # v1 reference dialect
-          index.ts                 # public entry: binds core to the pg adapter
+          index.ts                 # exports only the pgDialect token
           adapter.ts               # DialectAdapter implementation for node-postgres
           bootstrap.ts             # tracking-table DDL + drift assertion
           tables.ts                # drizzle pg-core definitions of tracking tables
         mysql/
-          index.ts                 # stub: throws "mysql adapter not implemented in v1"
+          index.ts                 # token; every adapter method throws at first use
         sqlite/
-          index.ts                 # stub: throws "sqlite adapter not implemented in v1"
+          index.ts                 # token; every adapter method throws at first use
       test/
         engine.test.ts             # core engine against a fake in-memory adapter
         pg.integration.test.ts     # testcontainers postgres
@@ -453,7 +454,7 @@ A normal TS module owned by the consuming app, imported by its bin script:
 
 ```ts
 // app: src/db/migrator.config.ts
-import { defineConfig } from "@dugstack/drizzle-migrator/pg";
+import { defineConfig } from "@dugstack/drizzle-migrator";
 
 export const migratorConfig = defineConfig({
   sqlDir: "./drizzle",            // drizzle-kit SQL output folder (default "./drizzle")
@@ -469,9 +470,9 @@ export const migratorConfig = defineConfig({
 });
 ```
 
-- `defineConfig` is an identity function with validation: identifier-shaped names
-  (`/^[a-z_][a-z0-9_]*$/`) for schema/table values, absolute-or-relative path sanity, required
-  `lockName`. Invalid values throw immediately with the offending field named.
+- `defineConfig` validates path sanity, required `lockName`, lock timings, and logger shape.
+  Schema and table identifiers are validated at `createMigrator` time through the selected
+  dialect's `quoteIdentifier`, so dialect-specific rules fail fast with the offending identifier.
 - Every runtime path (sqlDir, migrationsDir, schema, table names, lock key, timeouts, logger) is
   config — **nothing is set in stone** except the event/origin vocabulary itself.
 - Relative paths resolve from `process.cwd()` at call time (the bin script's working directory).
@@ -483,56 +484,42 @@ export const migratorConfig = defineConfig({
 ### `@dugstack/drizzle-migrator` (core, dialect-free)
 
 ```ts
+createMigrator<D extends DialectAdapter<any, any>>(options: {
+  dialect: D;
+  config: MigratorConfig;
+  migrations: Migration[];
+}): D extends DialectAdapter<infer TDb, infer TTx> ? Migrator<TDb, TTx> : never;
+
 defineMigration<TFiles extends readonly string[]>(migration: MigrationInput<TFiles>): Migration<TFiles>;
-defineConfig(config: MigratorConfigInput): MigratorConfig; // re-exported for typing convenience
-// types: Migration, MigrationContext<TFiles>, RunSqlFileRange, MigratorConfig,
-// types: Migration, MigrationContext<TFiles>, RunSqlFileRange, MigratorConfig,
-//        RunMigrationsResult, AdoptResult, StatusReport, GenerateResult, MigratorLogger,
-//        AuditLogEntry
+defineConfig(config: MigratorConfigInput): MigratorConfig;
+// types: Migrator, Migration, MigrationContext<TFiles>, RunSqlFileRange, MigratorConfig,
+//        RunMigrationsResult, AdoptResult, StatusReport, GenerateResult, ValidateResult,
+//        MigratorLogger, AuditLogEntry
 ```
 
-### `@dugstack/drizzle-migrator/pg` (v1 reference dialect)
+`Migrator<TDb, TTx>` binds dialect, config, and migrations at construction. Public methods:
+`runMigrations({ db, dryRun? })`, `adoptMigrations({ db, from?, to?, force?, confirmDatabase })`,
+`getStatus({ db })`, `validate()`, `generateMigrationEntry({ version?, name?, yes?, register? })`,
+and `createCli({ connect })`. Engine and CLI free functions remain internal. A database handle
+incompatible with selected dialect fails typechecking.
+
+### Dialect subpaths
 
 ```ts
-// All of the below bind the pg adapter. `db` is always injected by the consumer.
-runMigrations(options: {
-  db: NodePgDatabase<Record<string, never>>; // generic over the app's schema is a stretch goal
-  config: MigratorConfig;
-  migrations: Migration[];
-  dryRun?: boolean;
-}): Promise<RunMigrationsResult>;
-
-adoptMigrations(options: {
-  db: NodePgDatabase<Record<string, never>>;
-  config: MigratorConfig;
-  migrations: Migration[];
-  from?: string; to?: string; force?: boolean; confirmDatabase: string;
-}): Promise<AdoptResult>;
-
-getStatus(options: { db; config; migrations }): Promise<StatusReport>;
-
-generateMigrationEntry(options: {
-  config: MigratorConfig;
-  migrations: Migration[];
-  version?: string;  // skip prompt
-  name?: string;     // skip prompt
-  yes?: boolean;     // skip ALL prompts, use defaults
-  register?: boolean; // append import + entry to <migrationsDir>/index.ts if it exists
-}): Promise<GenerateResult>;
-
-createMigrationCli(options: {
-  config: MigratorConfig;
-  migrations: Migration[];
-  connect: () => Promise<{ db: NodePgDatabase<Record<string, never>>; close: () => Promise<void> }>;
-}): Promise<void>; // parses argv, dispatches, process.exitCode handling
+@dugstack/drizzle-migrator/pg: pgDialect, PgDialect
+@dugstack/drizzle-migrator/mysql: mysqlDialect, MysqlDialect
+@dugstack/drizzle-migrator/sqlite: sqliteDialect, SqliteDialect
 ```
+
+Each dialect subpath exports only its adapter token and type. MySQL and SQLite tokens throw
+`"<id> adapter is not implemented in v1"` when any adapter method runs, never on import.
 
 `connect` is a factory so each command opens and closes its own client — critical for the
 session-scoped advisory lock: acquire, migrate, and release must share **one** connection, so the
 engine must hold a single checked-out client for the whole run, never letting queries round-robin
 over a pool.
 
-### CLI commands (dispatched by `createMigrationCli`)
+### CLI commands (dispatched by `Migrator.createCli`)
 
 | command | flags | notes |
 | --- | --- | --- |
@@ -545,6 +532,9 @@ over a pool.
 ---
 
 ## 8. The `generate` command (user-specified behavior)
+
+`config` and `migrations` come from the constructed `Migrator`; callers supply only generation
+options. Behavior below remains unchanged.
 
 1. Scan `config.sqlDir` for top-level `*.sql` files (ignore `meta/`, journals, snapshots).
 2. "Unapplied" = present on disk but not referenced by any registered migration's `sqlFiles`.
@@ -617,9 +607,9 @@ export interface DialectAdapter<TDb = unknown, TTx = unknown> {
 ```
 
 The core engine (`src/core/engine.ts`) is written entirely against this interface and is tested
-against an **in-memory fake adapter** (no database) plus the real pg adapter in integration tests.
-`/mysql` and `/sqlite` stubs throw on construction with an "implemented in a future release" message
-while still exporting the full type surface so consumers can typecheck against them.
+through `createMigrator` with an **in-memory fake adapter** (no database) plus the real pg adapter
+in integration tests. Dialect subpaths export exactly one value: adapter token plus its type.
+MySQL and SQLite stub tokens throw at first adapter-method use, never on import.
 
 `/pg` specifics:
 
@@ -665,10 +655,12 @@ pg integration (testcontainers):
   rejected; helper files inside a version folder are accepted.
 - Skill sync: the bundled `SKILL.md`'s command and flag table matches the CLI dispatch table
   (parse both and diff — the skill drifting from the CLI is a bug).
-- Config validation: bad identifiers, missing `lockName`.
+- Config validation: generic config errors, bad identifiers through `createMigrator`, missing
+  `lockName`; factory smoke coverage; all stub adapter methods throw exact errors.
 - CI runs `build`, `lint`, `tsc --noEmit`, and tests. **`tsc --noEmit` is mandatory and never
   optional**: vitest does not typecheck by default, so the `expectTypeOf` assertions in
-  `types.test.ts` (the typed-sqlFiles contract, §4.1) are enforced only by the typecheck step.
+  `types.test.ts` (typed-sqlFiles and wrong-dialect `@ts-expect-error` contracts) are enforced
+  only by the typecheck step.
   Dropping typecheck from CI silently disables the package's central type guarantee.
 - CI matrix: integration suite against ≥2 `drizzle-orm` minor versions; Node 20 + 22.
 
@@ -681,16 +673,16 @@ pg integration (testcontainers):
    vitest, path-filtered CI skeleton.
 2. **Core engine**: types, defineMigration generics, registry validation, sql.ts, engine.ts against
    the fake adapter. Unit tests green.
-3. **pg adapter**: tables.ts, bootstrap.ts + drift assert, locking, `/pg` entry + `runMigrations`
+3. **pg adapter**: tables.ts, bootstrap.ts + drift assert, locking, `/pg` token + factory
    integration tests green.
-4. **CLI + config**: defineConfig validation, createMigrationCli, `migrate`/`status`/`validate`,
+4. **CLI + config**: defineConfig validation, `Migrator.createCli`, `migrate`/`status`/`validate`,
    `connect` lifecycle.
 5. **Commands**: `adopt` with all guards, `generate` with prompts/flags, `--dry-run`.
 6. **Hardening**: audit-event forensics docs, README (lead with "why not drizzle's built-in
    migrate()"), the bundled agent skill (§15) written and wired into docs, changesets, npm publish
    dry-run, `--provenance`, publish 0.1.0 alpha tag.
 7. **Flip the originating app (optional, separate task)**: versions import `defineMigration` from
-   the package, the app's old CLI becomes a `createMigrationCli` call, project migration docs are
+   the package, the app's old CLI becomes a `createMigrator(...).createCli` call, project migration docs are
    rewritten, typecheck passes, and one `migrate` runs against a scratch database.
 
 ---
@@ -700,8 +692,9 @@ pg integration (testcontainers):
 - [ ] The repo is a pnpm-workspace monorepo: private root, `packages/drizzle-migrator` as the only
       publishable unit, `apps/docs` reserved (empty, private), CI path-filtered to the package,
       publish runs from the package folder with provenance.
-- [ ] `npm i @dugstack/drizzle-migrator pg drizzle-orm` + a ~20-line bin script is the entire
-      consumer setup; no other wiring.
+- [ ] `npm i @dugstack/drizzle-migrator pg drizzle-orm` + a ~20-line bin script that constructs
+      `createMigrator({ dialect: pgDialect, config, migrations })` is the entire consumer setup.
+      A dialect-mismatched `db` is a compile error, proven by a `@ts-expect-error` test.
 - [ ] One config file controls sqlDir, migrationsDir, schema, table names, lockName, timeouts,
       logger. No hardcoded "gamersmetro" strings anywhere in `src/`.
 - [ ] `runSqlFile` is compile-time restricted to the migration's declared `sqlFiles`; cross-migration
@@ -774,8 +767,9 @@ path with config-relative language):
 
 1. **Required context** — before touching migrations, read the app's `migrator.config.ts`, the
    versions registry, the latest version folder, and the app's migration docs if present.
-2. **Workflow** — schema change → `drizzle-kit generate` → run the package's `generate` command to
-   scaffold `v<next>/index.ts` from unapplied SQL files → register (or `--register`) →
+2. **Workflow** — construct `createMigrator({ dialect, config, migrations })` → schema change →
+   `drizzle-kit generate` → run the migrator's `generate` command to scaffold `v<next>/index.ts`
+   from unapplied SQL files → register (or `--register`) →
    `typecheck` → `migrate` against a safe local DB → run `migrate` again and confirm "no pending
    migrations".
 3. **Migration entry pattern** — folder-per-version, canonical named export

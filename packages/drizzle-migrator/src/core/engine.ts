@@ -256,6 +256,9 @@ export async function adoptMigrations<TDb, TTx>(
     );
   }
 
+  // Adoption reads and writes tracking rows, so bootstrap after target-database guards pass.
+  await adapter.bootstrapTrackingTables(db, config);
+
   const appliedVersions = await adapter.readAppliedVersions(db, config);
   let rangeStart = fromVersion;
   if (appliedVersions.size > 0) {

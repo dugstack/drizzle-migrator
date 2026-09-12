@@ -1,7 +1,23 @@
 import { describe, expectTypeOf, it } from "vitest";
-import { defineMigration } from "../src/core/index.js";
+import { createMigrator, defineConfig, defineMigration } from "../src/core/index.js";
+import { pgDialect } from "../src/pg/index.js";
 
 describe("typed sqlFiles contract (smoke)", () => {
+  it("rejects database handles mismatched with the dialect", () => {
+    const migrator = createMigrator({
+      dialect: pgDialect,
+      config: defineConfig({ lockName: "types:test:lock" }),
+      migrations: [],
+    });
+
+    function assertDatabaseMismatch(): void {
+      // @ts-expect-error PostgreSQL migrators require NodePgDatabase handles.
+      void migrator.runMigrations({ db: { dialect: "mysql" } });
+    }
+
+    void assertDatabaseMismatch;
+  });
+
   it("infers literal sqlFiles from the array literal", () => {
     const migration = defineMigration({
       version: "0.0.1",

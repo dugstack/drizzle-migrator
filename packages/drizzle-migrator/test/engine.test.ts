@@ -458,6 +458,7 @@ describe("adoptMigrations against the fake adapter", () => {
       ["0.0.3", "adopted"],
       ["0.0.4", "adopted"],
     ]);
+    expect(env.db.defaultSchemaTables).toContain("migration_versions");
     expect(loggedKinds(env).filter((kind) => kind === "run.adopted")).toHaveLength(4);
   });
 
