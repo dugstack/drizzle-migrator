@@ -11,7 +11,7 @@ describe("cli defineConfig", () => {
       migratorOutDir: "./src/db/migrator",
     });
     expect(config.dialect).toBe("postgres");
-    expect(config.postgres.connectionString).toBe(GOOD_URL);
+    expect(config.postgres).toEqual({ connectionString: GOOD_URL });
     expect(config.migratorOutDir).toBe("./src/db/migrator");
     expect(config.lockName).toBe(DEFAULT_LOCK_NAME);
     expect(config.lockName).toBe("drizzle-migrator");
@@ -34,18 +34,44 @@ describe("cli defineConfig", () => {
     expect(config.schema).toBe("private_migrations");
   });
 
-  it("enforces the postgres discriminated member at compile time", () => {
-    const invalid = { dialect: "postgres", migratorOutDir: "./m" };
-    // @ts-expect-error dialect "postgres" requires the postgres block
-    expect(() => defineConfig(invalid)).toThrow(/"postgres" is required/);
-
-    const missingString = { dialect: "postgres", postgres: {}, migratorOutDir: "./m" };
-    // @ts-expect-error postgres.connectionString is required
-    expect(() => defineConfig(missingString)).toThrow(/"postgres.connectionString" is required/);
+  it("rejects mistyped config shapes at compile time", () => {
+    const numericConnectionString = {
+      dialect: "postgres",
+      postgres: { connectionString: 123 },
+      migratorOutDir: "./m",
+    };
+    // @ts-expect-error postgres.connectionString must be a string
+    expect(() => defineConfig(numericConnectionString)).toThrow(/must be a string when present/);
 
     const wrongDialect = { dialect: "mysql", migratorOutDir: "./m" };
     // @ts-expect-error only "postgres" exists in the union in v1
     expect(() => defineConfig(wrongDialect)).toThrow(/"dialect" must be "postgres"/);
+  });
+
+  it("resolves a missing postgres block to undefined (connection-free commands still run)", () => {
+    const config = resolveCliConfig({
+      dialect: "postgres",
+      migratorOutDir: "./m",
+    });
+    expect(config.postgres).toBeUndefined();
+  });
+
+  it("resolves an empty connection string to undefined instead of erroring", () => {
+    // Covers the `connectionString: process.env.DATABASE_URL` pattern with the
+    // env var unset: not a config error, a per-command requirement.
+    const unset = resolveCliConfig({
+      dialect: "postgres",
+      postgres: { connectionString: process.env.NEVER_SET_VAR as string },
+      migratorOutDir: "./m",
+    });
+    expect(unset.postgres).toBeUndefined();
+
+    const empty = resolveCliConfig({
+      dialect: "postgres",
+      postgres: { connectionString: "   " },
+      migratorOutDir: "./m",
+    });
+    expect(empty.postgres).toBeUndefined();
   });
 
   it("accepts a keyword (key=value) connection string", () => {
@@ -54,7 +80,7 @@ describe("cli defineConfig", () => {
       postgres: { connectionString: "host=localhost dbname=app" },
       migratorOutDir: "./m",
     });
-    expect(config.postgres.connectionString).toBe("host=localhost dbname=app");
+    expect(config.postgres?.connectionString).toBe("host=localhost dbname=app");
   });
 });
 
@@ -64,27 +90,20 @@ describe("cli config validation (runtime, on loaded exports)", () => {
     expect(() => resolveCliConfig("nope")).toThrow(/expected an object/);
   });
 
-  it("rejects a missing postgres block", () => {
-    expect(() => resolveCliConfig({ dialect: "postgres", migratorOutDir: "./m" })).toThrow(
-      /"postgres" is required/,
-    );
+  it("rejects a non-object postgres block", () => {
+    expect(() =>
+      resolveCliConfig({ dialect: "postgres", postgres: "nope", migratorOutDir: "./m" }),
+    ).toThrow(/"postgres" must be an object/);
   });
 
-  it("rejects an empty connection string", () => {
+  it("rejects a non-string connection string", () => {
     expect(() =>
       resolveCliConfig({
         dialect: "postgres",
-        postgres: { connectionString: "" },
+        postgres: { connectionString: 123 },
         migratorOutDir: "./m",
       }),
-    ).toThrow(/"postgres.connectionString" is required and must be a non-empty string/);
-    expect(() =>
-      resolveCliConfig({
-        dialect: "postgres",
-        postgres: { connectionString: "   " },
-        migratorOutDir: "./m",
-      }),
-    ).toThrow(/"postgres.connectionString" is required/);
+    ).toThrow(/"postgres.connectionString" must be a string when present/);
   });
 
   it("rejects a non-postgres URL scheme", () => {

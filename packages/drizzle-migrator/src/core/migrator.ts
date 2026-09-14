@@ -1,14 +1,22 @@
+import { randomUUID } from "node:crypto";
 import type { DialectAdapter } from "./adapter.js";
-import { createMigrationCli } from "./cli.js";
+import type { AuditLogEntry } from "./audit.js";
 import type { MigratorConfig } from "./config.js";
 import { adoptMigrations, getStatus, runMigrations } from "./engine.js";
-import { generateMigrationEntry } from "./generate.js";
-import type { GenerateResult } from "./generate.js";
+import { generateMigrationEntry, suggestMigrationEntry } from "./generate.js";
+import type { GenerateResult, MigrationEntrySuggestion } from "./generate.js";
 import type { Migration } from "./migration.js";
 import { validateRegistry } from "./registry.js";
 import type { AdoptResult, RunMigrationsResult, StatusReport } from "./result.js";
 
 export type MigrationEntriesValidationResult = { ok: boolean; errors: string[] };
+
+/**
+ * Options for `validateMigrationEntries`. Passing `db` additionally records the
+ * `validation.started` / `validation.completed|failed` audit trail; omitting it
+ * keeps validation completely connection-free.
+ */
+export type ValidationAuditOptions<TDb> = { db?: TDb };
 
 export interface Migrator<TDb, _TTx> {
   runMigrations(options: { db: TDb; dryRun?: boolean }): Promise<RunMigrationsResult>;
@@ -20,19 +28,51 @@ export interface Migrator<TDb, _TTx> {
     confirmDatabase: string;
   }): Promise<AdoptResult>;
   getStatus(options: { db: TDb }): Promise<StatusReport>;
-  /** Validates every migration entry and its required on-disk files and folders. */
-  validateMigrationEntries(): Promise<MigrationEntriesValidationResult>;
+  /**
+   * Validates every migration entry and its required on-disk files and folders.
+   * Without `db` this never touches a database; with `db` it appends a
+   * `validation.started` event, then `validation.completed` (payload
+   * `status: "passed"`) or `validation.failed` (payload `status: "failed"`) —
+   * the audit rows' `at` values bracket the validation run. Audit-write
+   * failures are logged and ignored: they never replace the validation result.
+   */
+  validateMigrationEntries(
+    options?: ValidationAuditOptions<TDb>,
+  ): Promise<MigrationEntriesValidationResult>;
+  /** Domain defaults for the next entry: the next patch version and `pending-migration`. */
+  suggestMigrationEntry(): MigrationEntrySuggestion;
+  /**
+   * Scaffolds `v<version>/index.ts` from the unapplied SQL files. Performs no
+   * prompting and accepts no `yes` flag: `version` and `name` must be resolved
+   * (the CLI calls `suggestMigrationEntry()` first, prompts, then passes
+   * explicit values).
+   */
   generateMigrationEntry(options: {
-    version?: string;
-    name?: string;
-    yes?: boolean;
+    version: string;
+    name: string;
     register?: boolean;
   }): Promise<GenerateResult>;
-  createCli(options: {
-    connect: () => Promise<{ db: TDb; close: () => Promise<void> }>;
-    /** Defaults to process.argv.slice(2); the CLI executable forwards its own argv. */
-    argv?: readonly string[];
-  }): Promise<void>;
+  /**
+   * Appends one audit event through the configured audit storage onto the
+   * supplied compatible database handle. The CLI uses this for redacted
+   * `cli.command` events; custom CLIs receive equal access. Errors propagate —
+   * callers decide whether an audit failure is fatal.
+   */
+  appendAuditEvent(options: { db: TDb; entry: AuditLogEntry }): Promise<void>;
+}
+
+/** Audit writes must never mask the operation they observe: failures are logged and swallowed. */
+async function emitAudit<TDb, TTx>(
+  adapter: DialectAdapter<TDb, TTx>,
+  db: TDb,
+  config: MigratorConfig,
+  entry: AuditLogEntry,
+): Promise<void> {
+  try {
+    await adapter.appendLog(db, config, { ...entry, id: entry.id ?? randomUUID() });
+  } catch (error) {
+    config.logger.error(`[drizzle-migrator] failed to write audit event "${entry.kind}":`, error);
+  }
 }
 
 /** Binds project-static inputs once, leaving database handles command-specific. */
@@ -64,18 +104,39 @@ export function createMigrator<D extends DialectAdapter<any, any>>(options: {
         confirmDatabase,
       }),
     getStatus: ({ db }) => getStatus({ db, adapter: dialect, config, migrations }),
-    async validateMigrationEntries() {
+    suggestMigrationEntry: () => suggestMigrationEntry(migrations),
+    async validateMigrationEntries(options = {}) {
+      const { db } = options;
+      // The start marker is written before validating so the audit rows' `at`
+      // values genuinely bracket the run.
+      if (db !== undefined) {
+        await emitAudit(dialect, db, config, { kind: "validation.started" });
+      }
       try {
-        await validateRegistry(migrations, config);
+        const sorted = await validateRegistry(migrations, config);
+        if (db !== undefined) {
+          await emitAudit(dialect, db, config, {
+            kind: "validation.completed",
+            payload: { status: "passed", migrations: sorted.length },
+          });
+        }
         return { ok: true, errors: [] };
       } catch (error) {
-        return { ok: false, errors: [error instanceof Error ? error.message : String(error)] };
+        const message = error instanceof Error ? error.message : String(error);
+        if (db !== undefined) {
+          await emitAudit(dialect, db, config, {
+            kind: "validation.failed",
+            payload: { status: "failed" },
+            detail: message,
+          });
+        }
+        return { ok: false, errors: [message] };
       }
     },
     generateMigrationEntry: (generateOptions) =>
       generateMigrationEntry({ config, migrations, ...generateOptions }),
-    createCli: ({ connect, argv }) =>
-      createMigrationCli({ adapter: dialect, config, migrations, connect, argv }),
+    appendAuditEvent: ({ db, entry }) =>
+      dialect.appendLog(db, config, { ...entry, id: entry.id ?? randomUUID() }),
   };
 
   return migrator as D extends DialectAdapter<infer TDb, infer TTx> ? Migrator<TDb, TTx> : never;

@@ -90,13 +90,10 @@ drizzle-migrator/                  # repo root — private, never published
       package.json                 # @dugstack/drizzle-migrator (essentials below)
       tsconfig.json
       vitest.config.ts
-      skills/
-        drizzle-migrator/         # bundled agent skill — a first-class, shipped artifact (see §15)
-          SKILL.md
       src/
         core/                      # dialect-agnostic engine — no pg imports allowed
           index.ts                 # public factory, migration/config definitions, public types
-          migrator.ts              # createMigrator factory + Migrator interface
+          migrator.ts              # createMigrator factory + Migrator service interface
           engine.ts                # runMigrations / adoptMigrations / getStatus orchestration
           migration.ts             # defineMigration + Migration/MigrationContext types
           registry.ts              # sort + validate (versions, sqlFiles uniqueness, file existence)
@@ -104,8 +101,7 @@ drizzle-migrator/                  # repo root — private, never published
           config.ts                # MigratorConfig type + defineConfig validation
           adapter.ts               # DialectAdapter interface (the dialect seam)
           audit.ts                 # audit event kinds + payload types
-          cli.ts                   # internal CLI dispatcher: argv parsing + command dispatch
-          generate.ts              # generate command logic (scaffold entry files)
+          generate.ts              # prompt-free entry generation + suggestion defaults
           result.ts                # RunMigrationsResult / AdoptResult / StatusReport types
         pg/                        # v1 reference dialect
           index.ts                 # exports only the pgDialect token
@@ -119,28 +115,38 @@ drizzle-migrator/                  # repo root — private, never published
       test/
         engine.test.ts             # core engine against a fake in-memory adapter
         pg.integration.test.ts     # testcontainers postgres
-        cli.test.ts
+        config.test.ts
+        migrator.test.ts           # factory surface + service methods (validation audits, suggestion, appendAuditEvent)
         generate.test.ts
         types.test.ts              # expectTypeOf guards for the typed sqlFiles contract
-        skill-sync.test.ts         # SKILL.md command/flag table matches the CLI dispatch table
-    drizzle-migrator-cli/          # REVISION 2: the executable — config + entry discovery, pg wiring
+    drizzle-migrator-cli/          # the executable — sole CLI owner (Revision 3): command table,
+                                   # dispatch, flag parsing, prompts, usage, skills, pg wiring
       package.json                 # @dugstack/drizzle-migrator-cli; bin: migrator -> ./dist/bin.js
+      skills/
+        drizzle-migrator/         # bundled agent skill — a first-class, shipped artifact (see §15)
+          SKILL.md
       src/
-        config.ts                  # dialect-discriminated CLI config + validation ("postgres" member)
-        discovery.ts               # config-file discovery + v<semver>/index.ts auto-discovery
+        commands.ts               # THE single command table: names, flags, requiresDatabase,
+                                  # descriptions; dispatch, flag validation, usage, and the
+                                  # README/skill sync tests all consume this one definition
+        config.ts                 # dialect-discriminated CLI config + validation ("postgres" member;
+                                  # postgres block optional — database commands fail without it)
+        discovery.ts              # config-file discovery + v<semver>/index.ts auto-discovery
         drizzle-out.ts             # sqlDir resolution: drizzleOutDir > drizzle.config out > "./drizzle"
         loader.ts                  # jiti-based TypeScript module loader (configs + entries)
         connect.ts                 # pg.Client -> drizzle(client) wiring (one dedicated client per command)
-        usage.ts                   # usage table (test-synced against the core dispatch table)
-        run.ts                     # runCli: parse global flags, resolve, wire, forward to the core dispatcher
+        prompts.ts                 # readline prompting for generate (the core never prompts)
+        usage.ts                   # usage rendering from the single command table
+        run.ts                     # runCli: global flags, command parsing, dispatch, output, exit codes
         bin.ts                     # #!/usr/bin/env node executable entry
       test/
-        config.test.ts             # postgres type requirements + connection-string validation
+        config.test.ts             # postgres-block optionality + connection-string validation
         discovery.test.ts          # folder-naming validation + config path discovery
         drizzle-out.test.ts        # manual vs drizzle-derived SQL directory
-        run.test.ts                # global flags + command forwarding to the core dispatcher
-        usage-sync.test.ts         # usage-table drift guard vs the core CLI dispatch table
-        pg.integration.test.ts     # full testcontainers path (migrate / status / generate)
+        run.test.ts                # global flags + CLI-owned dispatch per command
+        usage.test.ts              # usage rendering covers every command/flag in the table
+        skill-sync.test.ts         # SKILL.md command/flag table matches the CLI command table
+        pg.integration.test.ts     # full testcontainers path (migrate / status / generate / validate)
 ```
 
 ### `package.json` essentials (lives at `packages/drizzle-migrator/package.json`)
@@ -158,7 +164,7 @@ drizzle-migrator/                  # repo root — private, never published
     "./mysql": { "types": "./dist/mysql/index.d.ts", "import": "./dist/mysql/index.js" },
     "./sqlite": { "types": "./dist/sqlite/index.d.ts", "import": "./dist/sqlite/index.js" }
   },
-  "files": ["dist", "skills"],
+  "files": ["dist"],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
@@ -180,8 +186,9 @@ drizzle-migrator/                  # repo root — private, never published
 
 Rules:
 
-- **Zero runtime dependencies.** Everything is `drizzle-orm` + node builtins. The CLI parses argv
-  by hand and prompts via `node:readline/promises` — do not add commander/inquirer/etc.
+- **Zero runtime dependencies.** Everything is `drizzle-orm` + node builtins. The CLI package
+  parses argv by hand and prompts via `node:readline/promises` — do not add
+  commander/inquirer/etc. (to either package).
 - Build with **tsup** (ESM output only, `dts: true`, per-entry files so subpaths resolve).
 - `drizzle-orm` and `pg` are **peer dependencies only**. CI must run the integration suite against
   a matrix of at least two drizzle-orm minor versions to prove the peer range.
@@ -353,6 +360,9 @@ Emitted by the engine automatically:
 | kind | version | payload/detail |
 | --- | --- | --- |
 | `cli.command` | – | `{ command, flags }` (argv echo, redacted) |
+| `validation.started` | – | written by `validateMigrationEntries({ db })` before validating |
+| `validation.completed` | – | `{ status: "passed", migrations }` — written only on success |
+| `validation.failed` | – | `{ status: "failed" }`, `detail` = the joined validation errors |
 | `lock.acquired` / `lock.waiting` / `lock.released` / `lock.timeout` | – | wait durations |
 | `bootstrap.completed` | – | tracking schema/table names |
 | `run.started` | ✓ | `{ name, runId }` |
@@ -364,6 +374,9 @@ Emitted by the engine automatically:
 - `run.started` is written inside the migration transaction? **No** — deliberately written *outside*
   the transaction so it survives rollbacks; same for `run.failed` and `run.adopted`.
 - The audit log must never mask the real error: event-write failures are logged, never thrown.
+- The `validation.*` events are written by `validateMigrationEntries` only when a `db` is
+  supplied; their write failures are ignored entirely and never replace the validation result or
+  its errors.
 
 **Public append API** (decided): inside migrations,
 
@@ -514,16 +527,22 @@ defineMigration<TFiles extends readonly string[]>(migration: MigrationInput<TFil
 defineConfig(config: MigratorConfigInput): MigratorConfig;
 // types: Migrator, Migration, MigrationContext<TFiles>, RunSqlFileRange, MigratorConfig,
 //        RunMigrationsResult, AdoptResult, StatusReport, GenerateResult,
-//        MigrationEntriesValidationResult,
+//        MigrationEntrySuggestion, MigrationEntriesValidationResult, ValidationAuditOptions,
 //        MigratorLogger, AuditLogEntry
 ```
 
-`Migrator<TDb, TTx>` binds dialect, config, and migrations at construction. Public methods:
-`runMigrations({ db, dryRun? })`, `adoptMigrations({ db, from?, to?, force?, confirmDatabase })`,
-`getStatus({ db })`, `validateMigrationEntries()`,
-`generateMigrationEntry({ version?, name?, yes?, register? })`,
-and `createCli({ connect })`. Engine and CLI free functions remain internal. A database handle
-incompatible with selected dialect fails typechecking.
+`Migrator<TDb, TTx>` binds dialect, config, and migrations at construction. Public service
+methods: `runMigrations({ db, dryRun? })`,
+`adoptMigrations({ db, from?, to?, force?, confirmDatabase })`, `getStatus({ db })`,
+`validateMigrationEntries({ db? }?)` (connection-free without `db`; with `db`, writes
+`validation.started` then `validation.completed`/`validation.failed`, ignoring audit-write
+failures), `suggestMigrationEntry()` (next patch version + `pending-migration`),
+`generateMigrationEntry({ version, name, register? })` (no prompting, no `yes`; version and name
+must be resolved), and `appendAuditEvent({ db, entry })` (binds the configured audit storage to a
+supplied compatible handle — the CLI's door for redacted `cli.command` events, available equally
+to custom CLIs). The core never parses argv, prints output, sets exit codes, reads stdin, or
+opens connections; engine functions remain internal. A database handle incompatible with the
+selected dialect fails typechecking.
 
 ### Dialect subpaths
 
@@ -536,26 +555,31 @@ incompatible with selected dialect fails typechecking.
 Each dialect subpath exports only its adapter token and type. MySQL and SQLite tokens throw
 `"<id> adapter is not implemented in v1"` when any adapter method runs, never on import.
 
-`connect` is a factory so each command opens and closes its own client — critical for the
-session-scoped advisory lock: acquire, migrate, and release must share **one** connection, so the
-engine must hold a single checked-out client for the whole run, never letting queries round-robin
-over a pool.
+Database handles are command-specific: each call opens and closes its own client — critical for
+the session-scoped advisory lock: acquire, migrate, and release must share **one** connection, so
+the engine must hold a single checked-out client for the whole run, never letting queries
+round-robin over a pool.
 
-### CLI commands (dispatched by `Migrator.createCli`)
+### CLI commands (owned by the CLI package)
 
 | command | flags | notes |
 | --- | --- | --- |
-| `migrate` | `--dry-run` | the only command a deploy pipeline runs |
-| `adopt` | `--from= --to= --force --confirm-database=` | §5 |
-| `status` | `--json` | read-only |
-| `generate` | `--version= --name= --yes --register` | §8 |
-| `validate` | – | registry lint: versions, duplicate versions, duplicate sqlFiles, file existence; exit 1 with reasons |
+| `migrate` | `--dry-run` | the only command a deploy pipeline runs; requires a database |
+| `adopt` | `--from= --to= --force --confirm-database=` | §5; requires a database |
+| `status` | `--json` | read-only; requires a database |
+| `generate` | `--version= --name= --yes --register` | §8; connection-free |
+| `validate` | – | registry lint: versions, duplicate versions, duplicate sqlFiles, file existence; exit 1 with reasons; connection-free without a configured connection string |
 
-### CLI package (`@dugstack/drizzle-migrator-cli`, added by Revision 2)
+The table is defined once inside the CLI package (`src/commands.ts`, with a `requiresDatabase`
+marker per command) and drives command dispatch, flag validation, usage rendering, and the
+README/skill sync tests.
 
-The companion executable packages the standard consumer wiring into a `migrator` bin command.
-The core programmatic API (`createMigrator({ dialect, config, migrations })`) is unchanged; the
-CLI:
+### CLI package (`@dugstack/drizzle-migrator-cli`)
+
+The companion executable is the **sole CLI owner** (Revision 3): it defines the command table,
+parses argv, validates flags, prompts, renders output, maps errors to exit codes, and owns the
+Postgres connection lifecycle. The core programmatic API (`createMigrator({ dialect, config,
+migrations })` and the `Migrator` service methods) is unchanged. The CLI:
 
 - discovers `drizzle-migrator.config.{ts,mts,cts,js,mjs,cjs}` in the cwd (`--config <path>`
   overrides), loads it and the migration entries through **jiti** — configs and entries stay
@@ -564,7 +588,9 @@ CLI:
   ```ts
   export default defineConfig({
     dialect: "postgres",
-    postgres: { connectionString: process.env.DATABASE_URL! }, // required when dialect is "postgres"
+    // optional since Revision 3: generate/validate run without it; migrate/adopt/status
+    // fail before any connection attempt when it is absent
+    postgres: { connectionString: process.env.DATABASE_URL! },
     migratorOutDir: "./src/db/migrator",  // required; scanned for v<semver>/index.ts
     drizzleOutDir: "./drizzle",           // optional; wins over the drizzle config's out
     lockName: "myapp:migrator",           // optional; default "drizzle-migrator"
@@ -576,29 +602,35 @@ CLI:
   folder, folder name exactly `"v" + version`, unique versions, numeric sort — **no manual
   registry file**;
 - owns the pg connection wiring (`pg.Client` → `drizzle(client)` → `pgDialect` →
-  `createMigrator`), one dedicated session-scoped client per command;
-- forwards the §7 command table byte-identically to the core dispatcher. The only core change is
-  additive: `Migrator.createCli` accepts an optional `argv` (default `process.argv.slice(2)`) so
-  the executable can forward its own argv.
-
-The CLI package's usage table is test-synced against the core dispatch table (the same mechanism
-as the skill sync).
+  `createMigrator`), one dedicated session-scoped client per command, closed in `finally` blocks;
+- fails `migrate`/`adopt`/`status` before any connection attempt when the Postgres
+  configuration is absent; `generate` and `validate` remain connection-free (`validate` opens one
+  dedicated connection only when a connection string is configured, passing it to
+  `validateMigrationEntries` for the audit trail);
+- prompts for `generate` (via `node:readline/promises`) when `--yes` is absent, using the core's
+  `suggestMigrationEntry()` defaults, then calls `generateMigrationEntry` with explicit values;
+- appends redacted `cli.command` audit events through the public `appendAuditEvent` service
+  method — custom CLIs receive equal access.
 
 ---
 
 ## 8. The `generate` command (user-specified behavior)
 
 `config` and `migrations` come from the constructed `Migrator`; callers supply only generation
-options. Behavior below remains unchanged.
+options. Since Revision 3 the core performs **no prompting**: `generateMigrationEntry` requires
+resolved `version` and `name` values, and `suggestMigrationEntry()` exposes the domain defaults.
 
 1. Scan `config.sqlDir` for top-level `*.sql` files (ignore `meta/`, journals, snapshots).
 2. "Unapplied" = present on disk but not referenced by any registered migration's `sqlFiles`.
-3. Compute defaults: next **patch** version above the highest registered version
-   (`0.0.6` → `0.0.7`; empty registry → `0.0.1`), and kebab-case name default `pending-migration`.
-4. **Interactive by default**: prompt for version and name via `node:readline/promises`, showing
-   the defaults; empty input accepts the default.
-5. Flags skip prompts individually (`--version`, `--name`); `--yes` **skips all prompts and uses
-   every default** (suggested conventional name; alias `-y`).
+3. Defaults (owned by `suggestMigrationEntry()`): next **patch** version above the highest
+   registered version (`0.0.6` → `0.0.7`; empty registry → `0.0.1`), and kebab-case name default
+   `pending-migration`.
+4. **The CLI prompts** (via `node:readline/promises`) when `--yes` is absent, showing the
+   suggested defaults; empty input accepts the default. `--version`/`--name` skip prompts
+   individually; `--yes` **skips all prompts and uses every default** (alias `-y`). The CLI then
+   calls `generateMigrationEntry` with the resolved explicit values.
+5. The core validates the resolved `version` (`\d+.\d+.\d+`) and `name` (kebab-case) shapes
+   before writing anything.
 6. Write `<migrationsDir>/v<version>/index.ts` (folder-per-version, per §4.1):
 
 ```ts
@@ -708,8 +740,9 @@ pg integration (testcontainers):
   canonical named import with a fully specified ESM path (`./v<version>/index.js`).
 - Folder layout: folder-name !== `v` + version is rejected; a flat `<version>.ts` file is
   rejected; helper files inside a version folder are accepted.
-- Skill sync: the bundled `SKILL.md`'s command and flag table matches the CLI dispatch table
-  (parse both and diff — the skill drifting from the CLI is a bug).
+- Skill sync (CLI package): the bundled `SKILL.md`'s command and flag table matches the CLI's
+  single command table (parse both and diff — the skill drifting from the CLI is a bug), and no
+  undocumented or stale flag may appear anywhere in the skill.
 - Config validation: generic config errors, bad identifiers through `createMigrator`, missing
   `lockName`; factory smoke coverage; all stub adapter methods throw exact errors.
 - CI runs `build`, `lint`, `tsc --noEmit`, and tests. **`tsc --noEmit` is mandatory and never
@@ -730,15 +763,17 @@ pg integration (testcontainers):
    the fake adapter. Unit tests green.
 3. **pg adapter**: tables.ts, bootstrap.ts + drift assert, locking, `/pg` token + factory
    integration tests green.
-4. **CLI + config**: defineConfig validation, `Migrator.createCli`, `migrate`/`status`/`validate`,
-   `connect` lifecycle.
+4. **CLI + config**: defineConfig validation, the command surface for
+   `migrate`/`status`/`validate` with its `connect` lifecycle (the dispatcher moved from core
+   into the CLI package in Revision 3).
 5. **Commands**: `adopt` with all guards, `generate` with prompts/flags, `--dry-run`.
 6. **Hardening**: audit-event forensics docs, README (lead with "why not drizzle's built-in
    migrate()"), the bundled agent skill (§15) written and wired into docs, changesets, npm publish
    dry-run, `--provenance`, publish 0.1.0 alpha tag.
 7. **Flip the originating app (optional, separate task)**: versions import `defineMigration` from
-   the package, the app's old CLI becomes a `createMigrator(...).createCli` call, project migration docs are
-   rewritten, typecheck passes, and one `migrate` runs against a scratch database.
+   the package, the app's old CLI becomes a `createMigrator(...)` service call or the CLI package
+   executable, project migration docs are rewritten, typecheck passes, and one `migrate` runs
+   against a scratch database.
 
 ---
 
@@ -758,8 +793,9 @@ pg integration (testcontainers):
       export `migration_v<major>_<minor>_<patch>` (no default exports); the registry validator
       rejects folder-name/version drift and flat files; registry imports are fully specified ESM
       paths (`./v0.0.3/index.js`).
-- [ ] The agent skill (§15) ships inside the npm tarball (`files: ["dist", "skills"]`), installs
-      with standard agent tooling, and its command/flag table is test-verified against the CLI.
+- [ ] The agent skill (§15) ships inside the CLI package's npm tarball
+      (`files: ["dist", "skills"]` in `@dugstack/drizzle-migrator-cli`), installs with standard
+      agent tooling, and its command/flag table is test-verified against the CLI command table.
 - [ ] `migrate` is transactional per migration with atomic version recording; failures leave an
       audit trail that survives rollback.
 - [ ] `adopt` implements from/to/force exactly as §5 and only writes `origin: 'adopted'` rows.
@@ -767,9 +803,9 @@ pg integration (testcontainers):
 - [ ] `/mysql` and `/sqlite` subpaths exist and throw informative errors; the adapter interface is
       documented enough to add them without touching the core.
 - [ ] The CLI package (`@dugstack/drizzle-migrator-cli`) builds the `migrator` executable with
-      config discovery, migration-folder auto-discovery, drizzle-out resolution, and pg wiring;
-      commands are forwarded to the core dispatcher unchanged and covered by a testcontainers
-      end-to-end test.
+      the single command table, config discovery, migration-folder auto-discovery, drizzle-out
+      resolution, and pg wiring; commands are dispatched by the CLI against only the public
+      `Migrator` service methods and covered by a testcontainers end-to-end test.
 - [ ] Zero runtime dependencies; peer deps proven by a 2-version CI matrix; ESM-only build with
       per-entry `.d.ts`.
 - [ ] Integration tests cover every bullet in §10 and pass locally and in CI.
@@ -807,19 +843,21 @@ The package ships an **agent skill** — a `SKILL.md` operating manual that AI c
 they use the migrator correctly without human re-explanation. This is not documentation garnish;
 it is treated as part of the library's public surface, with the same care as the API.
 
-**Location and distribution:**
+**Location and distribution (Revision 3): the skill belongs to the CLI package** — it documents
+commands, which are CLI-owned:
 
-- Lives at `packages/drizzle-migrator/skills/drizzle-migrator/SKILL.md`, shipped in the npm tarball
-  via `files: ["dist", "skills"]`.
+- Lives at `packages/drizzle-migrator-cli/skills/drizzle-migrator/SKILL.md`, shipped in the CLI
+  npm tarball via `files: ["dist", "skills"]` (the core package ships `files: ["dist"]` only).
 - The skill directory is named `drizzle-migrator` (not `db-migration`) so it never collides with
   an app's own database skill when installed alongside it.
-- README documents the install story: `npx skills add @dugstack/drizzle-migrator` where such
-  installers exist, or a manual copy of `skills/drizzle-migrator/` into the agent's skills
-  directory (`.claude/skills/`, `.agents/skills/`, etc.). The tarball path is the canonical
-  source any installer can fetch from.
+- The CLI package README documents the install story: `npx skills add
+  @dugstack/drizzle-migrator-cli` where such installers exist, or a manual copy of
+  `skills/drizzle-migrator/` into the agent's skills directory (`.claude/skills/`, `.agents/skills/`,
+  etc.). The tarball path is the canonical source any installer can fetch from.
 - **Sync contract:** the skill's command/flag table is generated from — or test-diffed against —
-  the CLI dispatch table (§10 "Skill sync" test). The skill may never document a flag the CLI
-  doesn't have, and the CLI may not grow a flag the skill doesn't mention. A mismatch fails CI.
+  the CLI's single command table (`src/commands.ts`; the skill-sync test lives in the CLI
+  package). The skill may never document a flag the CLI doesn't have, and the CLI may not grow a
+  flag the skill doesn't mention. A mismatch fails CI.
 
 **Skill content outline** (port and generalize the operational manual; replace every app-specific
 path with config-relative language):
@@ -841,5 +879,5 @@ path with config-relative language):
    recorded version"; never widen a range to silence a pending migration; `CI` env refusal.
 7. **Verification SQL** — current version, recent log entries, stuck `run.started` forensics,
    adopted-origin listing (the queries from §4.3/§4.4).
-8. **Command table** — the five CLI commands and every flag, byte-identical to the CLI dispatch
-   table.
+8. **Command table** — the five CLI commands and every flag, byte-identical to the CLI's single
+   command table.

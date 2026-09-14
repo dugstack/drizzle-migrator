@@ -8,18 +8,22 @@ projects. The drizzle client is injected by the consumer; dialect-specific behav
 subpath exports: `/pg`, `/mysql`, `/sqlite`.
 
 - **Full specification:** [`drizzle-migrator-package-plan.md`](./drizzle-migrator-package-plan.md)
-- **Package (core + adapters):** [`packages/drizzle-migrator`](./packages/drizzle-migrator)
+- **Package (core + adapters):** [`packages/drizzle-migrator`](./packages/drizzle-migrator) — a
+  pure programmatic service (no CLI)
 - **Package (executable):** [`packages/drizzle-migrator-cli`](./packages/drizzle-migrator-cli) —
-  the `migrator` command with config and migration auto-discovery
-  ([Revision 2](./drizzle-migrator-revision-2-cli-package.md))
+  the `migrator` command: sole CLI owner (command table, dispatch, prompts, usage), config and
+  migration auto-discovery, Postgres wiring, and the bundled agent skill
+  ([Revision 3](./drizzle-migrator-revision-3-cli-separation.md))
 - **Docs website:** reserved, empty slot at [`apps/docs`](./apps/docs) (not built in v1, see plan §2)
 
 ## Status
 
-**Milestone 6 — hardening complete; Revision 2 (CLI package) implemented.** All five CLI
-commands, the `/pg` adapter, the full consumer README, and the bundled agent skill
-(`skills/drizzle-migrator/SKILL.md`, test-synced against the CLI dispatch table) are in place;
-the `@dugstack/drizzle-migrator-cli` executable adds config discovery, migration-folder
-auto-discovery, and pg connection wiring. Changesets and the provenance release pipeline are
+**Milestone 6 — hardening complete; Revision 3 (CLI separation) implemented.** The core package
+is a pure programmatic service (`runMigrations`, `adoptMigrations`, `getStatus`,
+`validateMigrationEntries`, `suggestMigrationEntry`, `generateMigrationEntry`,
+`appendAuditEvent`); the `@dugstack/drizzle-migrator-cli` executable owns the entire command
+surface — the single command table, argv parsing, prompts, usage, output, exit codes, optional
+Postgres configuration, and the bundled agent skill (`skills/drizzle-migrator/SKILL.md`,
+test-synced against the CLI command table). Changesets and the provenance release pipeline are
 wired but gated off until the real npm scope and `NPM_TOKEN` exist. Publishing is intentionally
 not possible until then.

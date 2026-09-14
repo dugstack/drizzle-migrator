@@ -24,7 +24,7 @@
       "import": "./dist/sqlite/index.js"
     }
   },
-  "files": ["dist", "skills"],
+  "files": ["dist"],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",

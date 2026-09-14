@@ -1,18 +1,15 @@
 # `@dugstack/drizzle-migrator-cli`
 
 The executable `migrator` command for [`@dugstack/drizzle-migrator`](../drizzle-migrator). One
-config file, no registry files, no bin script — the CLI discovers everything and owns the
-Postgres connection wiring.
+config file, no registry files, no bin script — the CLI discovers everything, owns the Postgres
+connection wiring, and owns the entire command surface: dispatch, flag parsing, prompts, usage
+text, output rendering, and exit codes. The core package is a pure programmatic service.
 
 ```sh
 pnpm migrator generate
 pnpm migrator migrate
 pnpm migrator --config ./db/migrator.config.ts status
 ```
-
-The core package's programmatic API is unchanged: the CLI is a thin layer that loads your config,
-auto-discovers migration folders, builds the connection, and forwards every command to the same
-core dispatcher the programmatic `Migrator.createCli` uses.
 
 ## Install
 
@@ -23,6 +20,20 @@ npm i -D @dugstack/drizzle-migrator-cli @dugstack/drizzle-migrator
 The CLI depends on `drizzle-orm`, `pg`, and `jiti` (the TypeScript config loader) directly — no
 extra setup. `migrator` is a `bin` entry: with pnpm, `pnpm exec migrator` or a `"migrator"` script
 alias; with npm, `npx migrator`.
+
+### Agent skill
+
+The CLI's npm tarball ships an agent operating manual at `skills/drizzle-migrator/SKILL.md` —
+command tables, migration patterns, operational rules, and verification SQL. Install it where
+your agent can read it:
+
+```sh
+npx skills add @dugstack/drizzle-migrator-cli
+```
+
+or copy `skills/drizzle-migrator/` into the agent's skills directory (`.claude/skills/`,
+`.agents/skills/`, …). The tarball path is the canonical source; the bundled command table is
+test-diffed against the CLI's single command table.
 
 ## Quick start
 
@@ -61,8 +72,8 @@ pnpm migrator migrate
 
 | field | required | notes |
 | --- | --- | --- |
-| `dialect` | ✓ | `"postgres"` only in v1; requires the matching `postgres` block |
-| `postgres.connectionString` | ✓ | `postgres://` URL or key=value connection string |
+| `dialect` | ✓ | `"postgres"` only in v1; pairs with the optional `postgres` block |
+| `postgres.connectionString` | – | `postgres://` URL or key=value connection string. Optional: `generate` and `validate` run without it; `migrate`, `adopt`, and `status` require it and fail before any connection attempt when it is absent |
 | `migratorOutDir` | ✓ | folder scanned for `v<semver>/index.ts` migration entries |
 | `drizzleOutDir` | – | drizzle-kit SQL output folder; see resolution below |
 | `lockName` | – | advisory-lock name; default `"drizzle-migrator"`. Never change after first deploy |
@@ -116,37 +127,57 @@ Before anything touches the database, discovery validates:
 - the entry's `version` field matches its folder name (`v0.0.1` ⇒ `"0.0.1"`);
 - versions are unique and sorted numerically (`0.10.0 > 0.9.0`).
 
-`generate` scaffolds the next `v<semver>/index.ts` from unapplied SQL files and prints (or, in the
-core, optionally registers) the canonical named export — see the core README for the entry rules
-and `ctx` reference.
+`generate` scaffolds the next `v<semver>/index.ts` from unapplied SQL files and prints (or, with
+`--register`, writes) the canonical named export — see the core README for the entry rules and
+`ctx` reference.
 
 ## Commands
 
 | command | flags | notes |
 | --- | --- | --- |
-| `migrate` | `--dry-run` | the only command a deploy pipeline runs |
-| `adopt` | `--from= --to= --force --confirm-database=` | record an existing DB as migrated |
-| `status` | `--json` | read-only |
-| `generate` | `--version= --name= --yes --register` | scaffold `v<next>/index.ts` from unapplied SQL files |
-| `validate` | – | lint the discovered registry; exit 1 with reasons |
+| `migrate` | `--dry-run` | the only command a deploy pipeline runs; requires a database |
+| `adopt` | `--from= --to= --force --confirm-database=` | record an existing DB as migrated; requires a database |
+| `status` | `--json` | read-only; requires a database |
+| `generate` | `--version= --name= --yes --register` | scaffold `v<next>/index.ts` from unapplied SQL files; connection-free |
+| `validate` | – | lint the discovered registry; exit 1 with reasons; connection-free without a configured connection string |
 
-Global flags: `--config=<path>`, `--help/-h`. Command behavior, output, audit events, and exit
-codes are owned by the core dispatcher — the CLI forwards your argv unchanged.
+Global flags: `--config=<path>`, `--help/-h`.
+
+The command table above is defined once inside the CLI (`src/commands.ts`) and drives everything:
+command dispatch, flag validation, usage rendering, and the bundled skill's sync test. The CLI
+owns all success/failure output, maps errors to exit codes, and closes every opened connection in
+a `finally` block.
+
+Connection rules:
+
+- **No `postgres.connectionString`?** `generate` and `validate` run entirely connection-free; the
+  database commands (`migrate`, `adopt`, `status`) fail before any connection attempt.
+- **`validate` with a configured connection string** opens one dedicated connection, passes it to
+  the core's `validateMigrationEntries` (recording the `validation.started` +
+  `validation.completed`/`validation.failed` audit trail), and always closes it. A connection
+  failure exits 1.
+- `generate` prompts for version and name when `--yes` is absent (empty input accepts the
+  default; the defaults come from the core's suggestion API); `--version`/`--name` skip prompts
+  individually; `--yes`/`-y` uses every default.
 
 ## How it works
 
-For each command the CLI: loads + validates the config, resolves the SQL directory, discovers
-migrations, then opens **one dedicated `pg.Client`**, wraps it with `drizzle(client)`, and binds
-`pgDialect` + config + migrations through `createMigrator(...)` before dispatching. The advisory
-lock is session-scoped, so acquire/migrate/release always share that single connection — the CLI
-owns this wiring; the core stays dialect-token based.
+For each command the CLI: parses and validates the command + flags against the command table
+(before touching the filesystem), loads + validates the config, resolves the SQL directory,
+discovers migrations, then — for database commands — opens **one dedicated `pg.Client`**, wraps
+it with `drizzle(client)`, and binds `pgDialect` + config + migrations through `createMigrator(...)`
+before dispatching. The advisory lock is session-scoped, so acquire/migrate/release always share
+that single connection — the CLI owns this wiring; the core stays a pure programmatic service.
 
 ## When to use the core package directly
 
 The CLI covers the standard project shape. Reach for the programmatic API
 ([`@dugstack/drizzle-migrator`](../drizzle-migrator)) when you need your own bin script, a
 non-postgres dialect token, or embedded migration runs — `createMigrator({ dialect, config,
-migrations })` and every `Migrator` method are unchanged.
+migrations })` plus the `Migrator` service methods (`runMigrations`, `adoptMigrations`,
+`getStatus`, `validateMigrationEntries`, `suggestMigrationEntry`, `generateMigrationEntry`,
+`appendAuditEvent`) are the entire surface; the core never parses argv, prints output, or sets
+exit codes, so custom CLIs get exactly the same building blocks this executable uses.
 
 ## License
 

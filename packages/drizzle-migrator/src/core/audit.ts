@@ -1,5 +1,8 @@
 export type EngineAuditEventKind =
   | "cli.command"
+  | "validation.started"
+  | "validation.completed"
+  | "validation.failed"
   | "lock.acquired"
   | "lock.waiting"
   | "lock.released"

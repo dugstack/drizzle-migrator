@@ -58,6 +58,15 @@ export function configModule(connectionString = "postgres://user:pass@localhost:
 `;
 }
 
+/** A valid config with no postgres block at all — connection-free commands must still run. */
+export function configModuleWithoutPostgres(): string {
+  return `export default {
+  dialect: "postgres",
+  migratorOutDir: "./src/db/migrator",
+};
+`;
+}
+
 export function migrationEntry(version: string, name: string, sqlFiles: string[] = []): string {
   const exportName = `migration_v${version.replaceAll(".", "_")}`;
   const files = sqlFiles.map((file) => JSON.stringify(file)).join(", ");

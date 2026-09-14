@@ -250,4 +250,94 @@ suite("cli end-to-end (testcontainers)", () => {
     },
     TIMEOUT,
   );
+
+  it(
+    "validate with Postgres configuration records started plus terminal audit events",
+    async () => {
+      process.chdir(project);
+      process.env.DATABASE_URL = fixtureDatabaseUri;
+
+      process.exitCode = 0;
+      infoSpy.mockClear();
+      await runCli(["validate"]);
+      expect(process.exitCode).toBe(0);
+      expect(infoOutput()).toMatch(/registry ok: 2 migration\(s\)/);
+
+      const client = new Client({ connectionString: fixtureDatabaseUri });
+      await client.connect();
+      try {
+        const logs = await client.query<{ kind: string; payload: unknown }>(
+          'SELECT kind, payload FROM "migrations"."migration_logs" WHERE kind LIKE \'validation.%\' ORDER BY at',
+        );
+        expect(logs.rows.map((row) => row.kind)).toEqual([
+          "validation.started",
+          "validation.completed",
+        ]);
+        expect(logs.rows[1]?.payload).toMatchObject({ status: "passed" });
+      } finally {
+        await client.end();
+      }
+    },
+    TIMEOUT,
+  );
+
+  it(
+    "a project without postgres configuration validates and generates but refuses database commands",
+    async () => {
+      const noDbProject = await mkdtemp(join(fixtureRoot, "e2e-nodb-"));
+      try {
+        await mkdir(join(noDbProject, "drizzle"), { recursive: true });
+        await mkdir(join(noDbProject, "src/db/migrator/v0.0.1"), { recursive: true });
+        await writeFile(
+          join(noDbProject, "drizzle-migrator.config.ts"),
+          `export default {\n  dialect: "postgres",\n  migratorOutDir: "./src/db/migrator",\n};\n`,
+          "utf8",
+        );
+        await writeFile(
+          join(noDbProject, "drizzle/0001_users.sql"),
+          "CREATE TABLE users (id int PRIMARY KEY);",
+          "utf8",
+        );
+        // Unclaimed by any migration: `generate --yes` below scaffolds v0.0.2 from it.
+        await writeFile(
+          join(noDbProject, "drizzle/0002_posts.sql"),
+          "CREATE TABLE posts (id int);",
+          "utf8",
+        );
+        await writeFile(
+          join(noDbProject, "src/db/migrator/v0.0.1/index.ts"),
+          migrationEntry("0.0.1", "users", ["0001_users.sql"]),
+          "utf8",
+        );
+
+        process.chdir(noDbProject);
+        Reflect.deleteProperty(process.env, "DATABASE_URL");
+
+        // Connection-free commands work with no postgres configuration at all.
+        await runCli(["validate"]);
+        expect(process.exitCode).toBe(0);
+        expect(infoOutput()).toMatch(/registry ok: 1 migration\(s\)/);
+
+        process.exitCode = 0;
+        infoSpy.mockClear();
+        await runCli(["generate", "--yes"]);
+        expect(process.exitCode).toBe(0);
+        const generated = await readFile(
+          join(noDbProject, "src/db/migrator/v0.0.2/index.ts"),
+          "utf8",
+        );
+        expect(generated).toContain('"0002_posts.sql"');
+
+        // Database commands fail before any connection attempt.
+        process.exitCode = 0;
+        errorSpy.mockClear();
+        await runCli(["migrate"]);
+        expect(process.exitCode).toBe(1);
+        expect(errorOutput()).toMatch(/command "migrate" requires a database connection/);
+      } finally {
+        await rm(noDbProject, { recursive: true, force: true }).catch(() => {});
+      }
+    },
+    TIMEOUT,
+  );
 });

@@ -23,7 +23,12 @@ export type MigratorCliConfigInput = PostgresCliConfigInput;
 
 export type PostgresCliConfigInput = {
   dialect: "postgres";
-  postgres: PostgresCliConnection;
+  /**
+   * Optional since Revision 3: connection-free commands (`generate`, `validate`)
+   * run without it; commands that need a database (`migrate`, `adopt`, `status`)
+   * fail before execution when it is absent.
+   */
+  postgres?: PostgresCliConnection;
   /** Folder holding the migration entries; auto-discovery scans its v<semver>/index.ts folders. */
   migratorOutDir: string;
   /** drizzle-kit SQL output folder. Wins over the `out` field of drizzle.config.*. */
@@ -39,7 +44,8 @@ export type PostgresCliConfigInput = {
 
 export type MigratorCliConfig = {
   dialect: "postgres";
-  postgres: PostgresCliConnection;
+  /** undefined when no usable connection string is configured (see resolveCliConfig). */
+  postgres: PostgresCliConnection | undefined;
   migratorOutDir: string;
   drizzleOutDir: string | undefined;
   lockName: string;
@@ -70,10 +76,19 @@ function checkPath(field: string, value: unknown, errors: string[]): void {
   }
 }
 
-function checkConnectionString(value: unknown, errors: string[]): void {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    errors.push(`"postgres.connectionString" is required and must be a non-empty string`);
-    return;
+/**
+ * Validates the shape of a *provided* connection string. An absent or empty one
+ * is not a config error — the connection is optional; commands that require a
+ * database fail at run time with their own message. Returns true when a usable
+ * string was validated.
+ */
+function checkConnectionString(value: unknown, errors: string[]): boolean {
+  if (value === undefined || (typeof value === "string" && value.trim().length === 0)) {
+    return false;
+  }
+  if (typeof value !== "string") {
+    errors.push(`"postgres.connectionString" must be a string when present`);
+    return true;
   }
   const scheme = CONNECTION_STRING_SCHEME_PATTERN.exec(value)?.[1];
   if (scheme !== undefined) {
@@ -83,13 +98,14 @@ function checkConnectionString(value: unknown, errors: string[]): void {
         `"postgres.connectionString" URL scheme "${scheme}" is not postgres (expected postgres:// or postgresql://)`,
       );
     }
-    return;
+    return true;
   }
   if (!value.includes("=")) {
     errors.push(
       `"postgres.connectionString" must be a postgres:// URL or a key=value connection string (e.g. "host=localhost dbname=app")`,
     );
   }
+  return true;
 }
 
 /**
@@ -113,11 +129,21 @@ export function resolveCliConfig(input: unknown): MigratorCliConfig {
     );
   }
 
-  if (typeof raw.postgres !== "object" || raw.postgres === null) {
-    errors.push(`"postgres" is required when "dialect" is "postgres"`);
-  } else {
-    const postgres = raw.postgres as Record<string, unknown>;
-    checkConnectionString(postgres.connectionString, errors);
+  // The postgres block is optional: absent, empty, or env-var-driven undefined
+  // connection strings resolve to `postgres: undefined` so connection-free
+  // commands (generate, validate) keep working; database commands then fail at
+  // run time with a "requires a database" message instead of a config error.
+  let postgres: PostgresCliConnection | undefined;
+  if (raw.postgres !== undefined && raw.postgres !== null) {
+    if (typeof raw.postgres !== "object") {
+      errors.push(`"postgres" must be an object with a "connectionString" when present`);
+    } else {
+      const connection = raw.postgres as Record<string, unknown>;
+      const hasConnectionString = checkConnectionString(connection.connectionString, errors);
+      if (hasConnectionString && typeof connection.connectionString === "string") {
+        postgres = { connectionString: connection.connectionString };
+      }
+    }
   }
 
   if (typeof raw.migratorOutDir !== "string" || (raw.migratorOutDir as string).length === 0) {
@@ -140,9 +166,7 @@ export function resolveCliConfig(input: unknown): MigratorCliConfig {
   // schema/tables/lock/logger pass through unchanged; defineCoreConfig validates them.
   return {
     dialect: "postgres",
-    postgres: {
-      connectionString: (raw.postgres as { connectionString: string }).connectionString,
-    },
+    postgres,
     migratorOutDir: raw.migratorOutDir as string,
     drizzleOutDir: raw.drizzleOutDir as string | undefined,
     lockName: (raw.lockName as string | undefined) ?? DEFAULT_LOCK_NAME,

@@ -4,7 +4,11 @@ export type {
   MigratorLogger,
 } from "./config.js";
 export { createMigrator } from "./migrator.js";
-export type { MigrationEntriesValidationResult, Migrator } from "./migrator.js";
+export type {
+  MigrationEntriesValidationResult,
+  Migrator,
+  ValidationAuditOptions,
+} from "./migrator.js";
 export { defineMigration } from "./migration.js";
 export type {
   Migration,
@@ -12,7 +16,7 @@ export type {
   RunSqlFileRange,
 } from "./migration.js";
 export type { AuditLogEntry } from "./audit.js";
-export type { GenerateResult } from "./generate.js";
+export type { GenerateResult, MigrationEntrySuggestion } from "./generate.js";
 export type {
   AdoptResult,
   RunMigrationsResult,

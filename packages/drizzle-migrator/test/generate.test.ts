@@ -3,7 +3,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
 import { defineConfig } from "../src/core/config.js";
-import { canonicalExportName, generateMigrationEntry } from "../src/core/generate.js";
+import {
+  canonicalExportName,
+  generateMigrationEntry,
+  suggestMigrationEntry,
+} from "../src/core/generate.js";
 import { defineMigration } from "../src/core/index.js";
 import { createFakeLogger } from "./fake-adapter.js";
 
@@ -25,33 +29,22 @@ async function setupGenEnv(): Promise<GenEnv> {
   return { sqlDir, migrationsDir, config, logger };
 }
 
-function promptsThatThrow() {
-  return {
-    askVersion: async () => {
-      throw new Error("version prompt should not have been called");
-    },
-    askName: async () => {
-      throw new Error("name prompt should not have been called");
-    },
-  };
-}
+describe("suggestMigrationEntry", () => {
+  it("starts at 0.0.1 with the conventional default name for an empty registry", () => {
+    expect(suggestMigrationEntry([])).toEqual({ version: "0.0.1", name: "pending-migration" });
+  });
 
-function defaultAcceptingPrompts() {
-  const asked: string[] = [];
-  return {
-    asked,
-    prompts: {
-      askVersion: async (defaultValue: string) => {
-        asked.push(`version:${defaultValue}`);
-        return defaultValue;
-      },
-      askName: async (defaultValue: string) => {
-        asked.push(`name:${defaultValue}`);
-        return defaultValue;
-      },
-    },
-  };
-}
+  it("suggests the next patch version above the highest registered version", () => {
+    const migrations = [
+      defineMigration({ version: "0.0.6", name: "six", up: async () => {} }),
+      defineMigration({ version: "0.0.2", name: "two", up: async () => {} }),
+    ];
+    expect(suggestMigrationEntry(migrations)).toEqual({
+      version: "0.0.7",
+      name: "pending-migration",
+    });
+  });
+});
 
 describe("generateMigrationEntry", () => {
   let env: GenEnv;
@@ -60,7 +53,7 @@ describe("generateMigrationEntry", () => {
     env = await setupGenEnv();
   });
 
-  it("scaffolds the next patch version from unapplied files, ignoring meta/ and claimed files", async () => {
+  it("scaffolds the requested version from unapplied files, ignoring meta/ and claimed files", async () => {
     await writeFile(join(env.sqlDir, "0006_init.sql"), "CREATE TABLE init (id int);", "utf8");
     await writeFile(join(env.sqlDir, "0007_new_tables.sql"), "CREATE TABLE a (id int);", "utf8");
     await writeFile(join(env.sqlDir, "0008_more.sql"), "CREATE TABLE b (id int);", "utf8");
@@ -75,14 +68,13 @@ describe("generateMigrationEntry", () => {
       up: async () => {},
     });
 
-    const interactive = defaultAcceptingPrompts();
     const result = await generateMigrationEntry({
       config: env.config,
       migrations: [migration0_0_6],
-      prompts: interactive.prompts,
+      version: suggestMigrationEntry([migration0_0_6]).version,
+      name: "pending-migration",
     });
 
-    expect(interactive.asked).toEqual(["version:0.0.7", "name:pending-migration"]);
     expect(result).toMatchObject({
       version: "0.0.7",
       name: "pending-migration",
@@ -107,40 +99,7 @@ describe("generateMigrationEntry", () => {
     );
   });
 
-  it("starts at 0.0.1 for an empty registry and honors --yes without prompting", async () => {
-    await writeFile(join(env.sqlDir, "0001_first.sql"), "CREATE TABLE x (id int);", "utf8");
-
-    const result = await generateMigrationEntry({
-      config: env.config,
-      migrations: [],
-      yes: true,
-      prompts: promptsThatThrow(),
-    });
-
-    expect(result.version).toBe("0.0.1");
-    expect(result.name).toBe("pending-migration");
-    await expect(readFile(result.entryPath, "utf8")).resolves.toContain(
-      "export const migration_v0_0_1 = defineMigration({",
-    );
-  });
-
-  it("flags skip prompts individually", async () => {
-    await writeFile(join(env.sqlDir, "0009_late.sql"), "CREATE TABLE late (id int);", "utf8");
-
-    const interactive = defaultAcceptingPrompts();
-    const result = await generateMigrationEntry({
-      config: env.config,
-      migrations: [],
-      version: "0.1.0",
-      prompts: interactive.prompts,
-    });
-
-    expect(interactive.asked).toEqual(["name:pending-migration"]);
-    expect(result.version).toBe("0.1.0");
-    expect(result.name).toBe("pending-migration");
-  });
-
-  it("uses all flag values when both are given, never prompting", async () => {
+  it("uses the caller's explicit values verbatim and never prompts", async () => {
     await writeFile(join(env.sqlDir, "0009_late.sql"), "CREATE TABLE late (id int);", "utf8");
 
     const result = await generateMigrationEntry({
@@ -148,7 +107,6 @@ describe("generateMigrationEntry", () => {
       migrations: [],
       version: "0.2.0",
       name: "add-users",
-      prompts: promptsThatThrow(),
     });
 
     expect(result.version).toBe("0.2.0");
@@ -167,8 +125,7 @@ describe("generateMigrationEntry", () => {
         config: env.config,
         migrations: [],
         version: "0.0.7",
-        yes: true,
-        prompts: promptsThatThrow(),
+        name: "pending-migration",
       }),
     ).rejects.toThrow(/already exists.*never overwrite/s);
 
@@ -183,7 +140,7 @@ describe("generateMigrationEntry", () => {
         config: env.config,
         migrations: [],
         version: "abc",
-        prompts: promptsThatThrow(),
+        name: "pending-migration",
       }),
     ).rejects.toThrow(/version "abc" must match/);
 
@@ -193,7 +150,6 @@ describe("generateMigrationEntry", () => {
         migrations: [],
         version: "0.0.1",
         name: "Bad Name!",
-        prompts: promptsThatThrow(),
       }),
     ).rejects.toThrow(/must be kebab-case/);
   });
@@ -213,7 +169,6 @@ describe("generateMigrationEntry", () => {
         migrations: [claiming],
         version: "0.0.2",
         name: "x",
-        prompts: promptsThatThrow(),
       }),
     ).rejects.toThrow(/no unapplied SQL files/);
   });
@@ -236,9 +191,9 @@ describe("generateMigrationEntry", () => {
     const result = await generateMigrationEntry({
       config: env.config,
       migrations: [migration0_0_1],
-      yes: true,
+      version: "0.0.2",
+      name: "pending-migration",
       register: true,
-      prompts: promptsThatThrow(),
     });
 
     expect(result.version).toBe("0.0.2");
@@ -258,9 +213,9 @@ describe("generateMigrationEntry", () => {
     const missing = await generateMigrationEntry({
       config: env.config,
       migrations: [],
-      yes: true,
+      version: "0.0.1",
+      name: "pending-migration",
       register: true,
-      prompts: promptsThatThrow(),
     });
     expect(missing.registered).toBe(false);
     expect(env.logger.lines.join("\n")).toContain(
@@ -278,7 +233,6 @@ describe("generateMigrationEntry", () => {
       version: "0.0.2",
       name: "pending-migration",
       register: true,
-      prompts: promptsThatThrow(),
     });
     expect(unrecognized.registered).toBe(false);
     expect(env.logger.lines.join("\n")).toContain(
@@ -304,9 +258,9 @@ describe("generateMigrationEntry", () => {
     const result = await generateMigrationEntry({
       config: env.config,
       migrations: [migration0_0_1],
-      yes: true,
+      version: "0.0.2",
+      name: "pending-migration",
       register: true,
-      prompts: promptsThatThrow(),
     });
 
     expect(result.registered).toBe(true);

@@ -1,14 +1,16 @@
 ---
-name: drizzle-migrator
-description: Operating manual for @dugstack/drizzle-migrator — how AI agents add, register, run, verify, and adopt Drizzle ORM migrations safely. Read this before touching any migration files.
+name: drizzle-migrator-cli
+description: Operating manual for @dugstack/drizzle-migrator-cli — how AI agents use the migrator executable to add, register, run, verify, and adopt Drizzle ORM migrations safely. Read this before touching any migration files.
 ---
 
-# drizzle-migrator — agent operating manual
+# drizzle-migrator-cli — agent operating manual
 
-Config-driven migration orchestrator for Drizzle ORM. The app owns a `migrator.config.ts`, a
-versions registry, and SQL files produced by `drizzle-kit generate`. This manual explains how to
-work with them without breaking the package's guarantees: forward-only history, atomic
-per-migration transactions, a surviving audit trail, and compile-time-restricted SQL files.
+The `migrator` executable (npm `@dugstack/drizzle-migrator-cli`) for the
+`@dugstack/drizzle-migrator` core. The app owns a `drizzle-migrator.config.ts`, version folders,
+and SQL files produced by `drizzle-kit generate`; the CLI discovers all of them and owns every
+command, prompt, and the Postgres connection, while the core engine keeps the guarantees this
+manual explains: forward-only history, atomic per-migration transactions, a surviving audit
+trail, and compile-time-restricted SQL files.
 
 Every name below (`migrations` schema, `migration_versions` / `migration_logs` tables) is a
 package default — read the app's `migrator.config.ts` first and substitute its configured names.
@@ -161,5 +163,5 @@ ORDER BY applied_at;
 | `generate` | `--version= --name= --yes --register` |
 | `validate` | – |
 
-This table is test-diffed against the CLI dispatch table — never edit one side without the
-other; a mismatch fails CI.
+This table is test-diffed against the CLI's command table (`src/commands.ts`, the single source
+of truth) — never edit one side without the other; a mismatch fails CI.

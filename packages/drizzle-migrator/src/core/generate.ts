@@ -1,7 +1,6 @@
 import type { Dirent } from "node:fs";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { createInterface } from "node:readline/promises";
 import type { MigratorConfig } from "./config.js";
 import type { Migration } from "./migration.js";
 import { compareVersions, sqlFilesOf } from "./registry.js";
@@ -11,9 +10,10 @@ const KEBAB_CASE_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const DEFAULT_NAME = "pending-migration";
 const REGISTRY_ARRAY_PATTERN = /(export const migrations\b[^=]*=\s*\[)([^\]]*?)(\]\s*;)/;
 
-export type GeneratePrompts = {
-  askVersion: (defaultValue: string) => Promise<string>;
-  askName: (defaultValue: string) => Promise<string>;
+/** The domain defaults `suggestMigrationEntry()` hands to callers (CLI prompts, custom CLIs). */
+export type MigrationEntrySuggestion = {
+  version: string;
+  name: string;
 };
 
 export type GenerateResult = {
@@ -27,31 +27,21 @@ export type GenerateResult = {
 export type GenerateMigrationEntryOptions = {
   config: MigratorConfig;
   migrations: readonly Migration[];
-  version?: string;
-  name?: string;
-  yes?: boolean;
+  /** Must be resolved by the caller — this function never prompts. */
+  version: string;
+  /** Must be resolved by the caller — this function never prompts. */
+  name: string;
   register?: boolean;
-  prompts?: GeneratePrompts;
 };
+
+/** Owns the domain defaults: the next patch version and the conventional placeholder name. */
+export function suggestMigrationEntry(migrations: readonly Migration[]): MigrationEntrySuggestion {
+  return { version: nextPatchVersion(migrations), name: DEFAULT_NAME };
+}
 
 export function canonicalExportName(version: string): string {
   return `migration_v${version.replaceAll(".", "_")}`;
 }
-
-async function askWithDefault(question: string, fallback: string): Promise<string> {
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    const answer = (await rl.question(question)).trim();
-    return answer.length > 0 ? answer : fallback;
-  } finally {
-    rl.close();
-  }
-}
-
-const defaultPrompts: GeneratePrompts = {
-  askVersion: (defaultValue) => askWithDefault(`Version [${defaultValue}]: `, defaultValue),
-  askName: (defaultValue) => askWithDefault(`Name [${defaultValue}]: `, defaultValue),
-};
 
 async function scanSqlFiles(sqlDir: string): Promise<string[]> {
   let dirents: Dirent[];
@@ -160,8 +150,7 @@ async function appendToRegistry(
 export async function generateMigrationEntry(
   options: GenerateMigrationEntryOptions,
 ): Promise<GenerateResult> {
-  const { config, migrations, version, name, yes = false, register = false } = options;
-  const prompts = options.prompts ?? defaultPrompts;
+  const { config, migrations, version, name, register = false } = options;
   const logger = config.logger;
 
   const allSqlFiles = await scanSqlFiles(config.sqlDir);
@@ -173,37 +162,19 @@ export async function generateMigrationEntry(
   }
   const unapplied = allSqlFiles.filter((file) => !claimed.has(file));
 
-  const defaultVersion = nextPatchVersion(migrations);
-
-  let chosenVersion: string;
-  if (version !== undefined) {
-    chosenVersion = version;
-  } else if (yes) {
-    chosenVersion = defaultVersion;
-  } else {
-    chosenVersion = await prompts.askVersion(defaultVersion);
+  // Version and name arrive already resolved (the CLI prompts against
+  // `suggestMigrationEntry()`; programmatic callers pass explicit values), so
+  // only their shape is validated here.
+  if (!VERSION_PATTERN.test(version)) {
+    throw new Error(`generate: version ${JSON.stringify(version)} must match \\d+\\.\\d+\\.\\d+`);
   }
-  if (!VERSION_PATTERN.test(chosenVersion)) {
+  if (!KEBAB_CASE_PATTERN.test(name)) {
     throw new Error(
-      `generate: version ${JSON.stringify(chosenVersion)} must match \\d+\\.\\d+\\.\\d+`,
+      `generate: name ${JSON.stringify(name)} must be kebab-case (${KEBAB_CASE_PATTERN.source})`,
     );
   }
 
-  let chosenName: string;
-  if (name !== undefined) {
-    chosenName = name;
-  } else if (yes) {
-    chosenName = DEFAULT_NAME;
-  } else {
-    chosenName = await prompts.askName(DEFAULT_NAME);
-  }
-  if (!KEBAB_CASE_PATTERN.test(chosenName)) {
-    throw new Error(
-      `generate: name ${JSON.stringify(chosenName)} must be kebab-case (${KEBAB_CASE_PATTERN.source})`,
-    );
-  }
-
-  const entryDir = join(config.migrationsDir, `v${chosenVersion}`);
+  const entryDir = join(config.migrationsDir, `v${version}`);
   const entryPath = join(entryDir, "index.ts");
   let entryExists = false;
   try {
@@ -214,7 +185,7 @@ export async function generateMigrationEntry(
   }
   if (entryExists) {
     throw new Error(
-      `generate: migration entry for version ${chosenVersion} already exists (${entryDir}) — never overwrite an existing entry`,
+      `generate: migration entry for version ${version} already exists (${entryDir}) — never overwrite an existing entry`,
     );
   }
 
@@ -225,15 +196,15 @@ export async function generateMigrationEntry(
   }
 
   await mkdir(entryDir, { recursive: true });
-  await writeFile(entryPath, renderEntry(chosenVersion, chosenName, unapplied), "utf8");
+  await writeFile(entryPath, renderEntry(version, name, unapplied), "utf8");
 
   let registered = false;
   if (register) {
-    registered = await appendToRegistry(config, chosenVersion, canonicalExportName(chosenVersion));
+    registered = await appendToRegistry(config, version, canonicalExportName(version));
   }
   if (!registered) {
-    printRegisterSnippet(logger, chosenVersion);
+    printRegisterSnippet(logger, version);
   }
 
-  return { version: chosenVersion, name: chosenName, entryPath, sqlFiles: unapplied, registered };
+  return { version, name, entryPath, sqlFiles: unapplied, registered };
 }

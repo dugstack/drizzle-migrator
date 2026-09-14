@@ -5,7 +5,10 @@
 
 A standalone, config-driven database migration orchestrator for [Drizzle ORM](https://orm.drizzle.team)
 projects. The drizzle client is injected by the consumer; dialect-specific behavior lives behind
-subpath exports: [`/pg`](#dialects), `/mysql`, `/sqlite`.
+subpath exports: [`/pg`](#dialects), `/mysql`, `/sqlite`. It is a pure programmatic service: no
+argv parsing, no output, no exit codes, no connections — the companion
+[`@dugstack/drizzle-migrator-cli`](../drizzle-migrator-cli/README.md) package owns the
+`migrator` executable.
 
 ## Why not drizzle's built-in `migrate()`?
 
@@ -32,7 +35,6 @@ This package fixes all four:
 5. **A guarded `adopt` command** for existing databases.
 6. **`status`, `dry-run`, and `generate`** for day-to-day operation.
 7. **Config-driven everything** — one project config file; no set-in-stone names or paths.
-8. **A bundled agent skill** so AI coding agents use the migrator correctly out of the box.
 
 ## Install
 
@@ -44,12 +46,12 @@ Two ways to consume the migrator:
   npm i @dugstack/drizzle-migrator @dugstack/drizzle-migrator-cli
   ```
 
-  The companion package ships the `migrator` executable: it discovers your config, auto-discovers
-  migration folders, and owns the pg connection wiring (see
-  [Quick start — CLI executable](#quick-start--cli-executable) and the
-  [CLI README](../drizzle-migrator-cli/README.md)).
+  The companion package ships the `migrator` executable: it owns command dispatch, flag
+  parsing, prompts, and usage, discovers your config, auto-discovers migration folders, and
+  owns the pg connection wiring (see [Quick start — CLI executable](#quick-start--cli-executable)
+  and the [CLI README](../drizzle-migrator-cli/README.md)).
 
-- **Programmatic only** — install the core and wire your own bin script:
+- **Programmatic only** — install the core and call the service methods from your own tooling:
 
   ```sh
   npm i @dugstack/drizzle-migrator drizzle-orm pg
@@ -58,19 +60,6 @@ Two ways to consume the migrator:
   The core package has zero runtime dependencies; `drizzle-orm` and `pg` are peer dependencies.
   (The CLI package depends on `drizzle-orm`, `pg`, and `jiti` directly because it owns the
   connection wiring and loads TypeScript config files.)
-
-### Agent skill
-
-The npm tarball ships an agent operating manual at `skills/drizzle-migrator/SKILL.md` — command
-tables, migration patterns, operational rules, and verification SQL. Install it where your agent
-can read it:
-
-```sh
-npx skills add @dugstack/drizzle-migrator
-```
-
-or copy `skills/drizzle-migrator/` into the agent's skills directory (`.claude/skills/`,
-`.agents/skills/`, …). The tarball path is the canonical source.
 
 ## Quick start — CLI executable
 
@@ -93,13 +82,13 @@ pnpm migrator status --json
 ```
 
 Migration entries are auto-discovered from `<migratorOutDir>/v<semver>/index.ts` — no manual
-registry file. Command behavior, flags, and output are identical to the programmatic
-`createCli` (same dispatcher). Full reference: the
-[CLI package README](../drizzle-migrator-cli/README.md).
+registry file. `postgres` configuration is optional: `generate` and `validate` run without it,
+while `migrate`, `adopt`, and `status` require it and fail before any connection attempt
+otherwise. Full reference: the [CLI package README](../drizzle-migrator-cli/README.md).
 
 ## Quick start — programmatic core
 
-One config file, one bin script — that is the entire consumer setup.
+One config file, one `createMigrator` call — that is the entire consumer setup.
 
 ```ts
 // app: src/db/migrator.config.ts
@@ -120,7 +109,7 @@ export const migratorConfig = defineConfig({
 ```
 
 ```ts
-// app: scripts/migrate.ts — ~20 lines, the whole wiring
+// app: scripts/migrate.ts — the only file that knows the dialect + connection
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Client } from "pg";
 import { createMigrator } from "@dugstack/drizzle-migrator";
@@ -134,23 +123,33 @@ const migrator = createMigrator({
   migrations,
 });
 
-await migrator.createCli({
-  connect: async () => {
-    const client = new Client({ connectionString: process.env.DATABASE_URL });
-    await client.connect();
-    return { db: drizzle(client), close: () => client.end() };
-  },
-});
+// pg advisory locks are session-scoped: one dedicated Client, never a shared Pool.
+const client = new Client({ connectionString: process.env.DATABASE_URL });
+await client.connect();
+try {
+  const result = await migrator.runMigrations({ db: drizzle(client) });
+  console.log(`applied: ${result.applied.join(", ") || "none"}`);
+} finally {
+  await client.end();
+}
 ```
 
-For programmatic execution, call `await migrator.runMigrations({ db })`. Config, migrations, and
-dialect bind once during construction.
+Config, migrations, and dialect bind once during construction; database handles are
+command-specific. The bound service methods:
 
-Then: `node scripts/migrate.ts migrate`.
+| method | notes |
+| --- | --- |
+| `runMigrations({ db, dryRun? })` | apply pending migrations, or preview them |
+| `adoptMigrations({ db, from?, to?, force?, confirmDatabase })` | record an existing DB as migrated |
+| `getStatus({ db })` | current version, applied/pending, recent audit rows |
+| `validateMigrationEntries({ db? }?)` | registry lint; with `db`, also writes the `validation.*` audit trail |
+| `suggestMigrationEntry()` | domain defaults: next patch version + `"pending-migration"` |
+| `generateMigrationEntry({ version, name, register? })` | scaffold `v<version>/index.ts`; no prompting, `version`/`name` required |
+| `appendAuditEvent({ db, entry })` | append one audit event through the configured storage |
 
-> **pg advisory locks are session-scoped.** The `connect` factory must hand back a **single
-> dedicated connection** (a `pg.Client`, not a shared `Pool`) — acquire, migrate, and release
-> must share one connection. Do not share the client.
+> **pg advisory locks are session-scoped.** Every method that takes a `db` must receive a
+> **single dedicated connection** (a `pg.Client`, not a shared `Pool`) — acquire, migrate, and
+> release must share one connection. Do not share the client.
 
 ## Writing migrations
 
@@ -212,8 +211,12 @@ Each pending migration runs in its own transaction; the version row (`origin: 'e
 inserted **inside the same transaction** — applied-and-recorded, or neither.
 
 Engine lifecycle events (`run.started`, `run.applied`, `run.failed`, `run.adopted`, `lock.*`,
-`bootstrap.completed`, `cli.command`, `dryrun.completed`) are written **outside** transactions so
-they survive rollbacks. `ctx.audit(...)` writes **inside** the transaction — appropriate for
+`bootstrap.completed`, `validation.started`, `validation.completed`, `validation.failed`,
+`cli.command`, `dryrun.completed`) are written **outside** transactions so they survive
+rollbacks. `validateMigrationEntries({ db })` appends `validation.started`, then
+`validation.completed` (payload `status: "passed"`) or `validation.failed` — the rows' `at`
+values bracket the run; audit-write failures are ignored and never replace the validation
+result. `ctx.audit(...)` writes **inside** the transaction — appropriate for
 progress notes tied to the migration's outcome. Audit-write failures are logged, never thrown;
 they never mask the real error.
 
@@ -223,19 +226,24 @@ A migration attempt is reconstructed as: event `run.started` with no matching `r
 
 ## Commands
 
+Commands belong to the [`migrator` executable](../drizzle-migrator-cli/README.md), which defines,
+renders, and validates them from a single command table:
+
 | command | flags | notes |
 | --- | --- | --- |
-| `migrate` | `--dry-run` | the only command a deploy pipeline runs |
-| `adopt` | `--from= --to= --force --confirm-database=` | record an existing DB as migrated |
-| `status` | `--json` | read-only |
-| `generate` | `--version= --name= --yes --register` | scaffold `v<next>/index.ts` from unapplied SQL files |
-| `validate` | – | registry lint; exit 1 with reasons |
+| `migrate` | `--dry-run` | the only command a deploy pipeline runs; requires a database |
+| `adopt` | `--from= --to= --force --confirm-database=` | record an existing DB as migrated; requires a database |
+| `status` | `--json` | read-only; requires a database |
+| `generate` | `--version= --name= --yes --register` | scaffold `v<next>/index.ts` from unapplied SQL files; connection-free |
+| `validate` | – | registry lint; exit 1 with reasons; connection-free without a configured connection string |
 
-`generate` is interactive by default (prompts via `node:readline/promises`, empty input accepts
-the default); flags skip prompts individually; `--yes`/`-y` uses every default. It always emits
-the canonical named export and, with `--register`, appends the fully specified ESM import to the
-registry when it recognizes the `export const migrations` pattern — otherwise it prints the
-exact snippet to paste. It never overwrites an existing entry.
+`generate` prompts through the CLI (empty input accepts the default); `--version`/`--name` skip
+prompts individually and `--yes`/`-y` uses the core's suggestion defaults outright. The core's
+`generateMigrationEntry` never prompts: it requires resolved `version` and `name` values (the
+CLI obtains defaults from `suggestMigrationEntry()`). It always emits the canonical named
+export and, with `--register`, appends the fully specified ESM import to the registry when it
+recognizes the `export const migrations` pattern — otherwise it prints the exact snippet to
+paste. It never overwrites an existing entry.
 
 ## Adopting an existing database
 
@@ -308,7 +316,7 @@ LIMIT 20;
 - `@dugstack/drizzle-migrator` — `createMigrator`, `Migrator`, `defineMigration`,
   `defineConfig`, plus `Migration`, `MigrationContext`, `RunSqlFileRange`, `MigratorConfig`,
   `RunMigrationsResult`, `AdoptResult`, `StatusReport`, `GenerateResult`,
-  `MigrationEntriesValidationResult`,
+  `MigrationEntrySuggestion`, `MigrationEntriesValidationResult`, `ValidationAuditOptions`,
   `MigratorLogger`, and `AuditLogEntry` types.
 - `@dugstack/drizzle-migrator/pg` — `pgDialect`, `PgDialect`.
 - `@dugstack/drizzle-migrator/mysql` — `mysqlDialect`, `MysqlDialect`.
