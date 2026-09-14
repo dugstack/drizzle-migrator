@@ -4,7 +4,7 @@ export type {
   MigratorLogger,
 } from "./config.js";
 export { createMigrator } from "./migrator.js";
-export type { Migrator, ValidateResult } from "./migrator.js";
+export type { MigrationEntriesValidationResult, Migrator } from "./migrator.js";
 export { defineMigration } from "./migration.js";
 export type {
   Migration,

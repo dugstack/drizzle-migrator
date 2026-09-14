@@ -34,9 +34,9 @@ describe("createMigrator", () => {
       "generateMigrationEntry",
       "getStatus",
       "runMigrations",
-      "validate",
+      "validateMigrationEntries",
     ]);
-    await expect(migrator.validate()).resolves.toEqual({ ok: true, errors: [] });
+    await expect(migrator.validateMigrationEntries()).resolves.toEqual({ ok: true, errors: [] });
     await expect(migrator.runMigrations({ db })).resolves.toMatchObject({ applied: [] });
   });
 

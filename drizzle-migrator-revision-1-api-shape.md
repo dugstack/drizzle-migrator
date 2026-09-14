@@ -79,7 +79,7 @@ export interface Migrator<TDb, TTx> {
   }): Promise<AdoptResult>;
   getStatus(options: { db: TDb }): Promise<StatusReport>;
   /** Registry lint: versions, duplicates, sqlFiles uniqueness, on-disk existence. No db. */
-  validate(): Promise<ValidateResult>;
+  validateMigrationEntries(): Promise<MigrationEntriesValidationResult>;
   /** §8 of the base plan; config + migrations come from construction. */
   generateMigrationEntry(options: {
     version?: string;
@@ -93,7 +93,7 @@ export interface Migrator<TDb, TTx> {
   }): Promise<void>;
 }
 
-export type ValidateResult = { ok: boolean; errors: string[] };
+export type MigrationEntriesValidationResult = { ok: boolean; errors: string[] };
 
 export function createMigrator<D extends DialectAdapter<any, any>>(options: {
   dialect: D;
@@ -142,7 +142,7 @@ Rules for stubs:
 
 | module | exports |
 | --- | --- |
-| `@dugstack/drizzle-migrator` | `createMigrator`, `Migrator`, `defineMigration`, `defineConfig`, types: `Migration`, `MigrationContext<TFiles>`, `RunSqlFileRange`, `MigratorConfig`, `RunMigrationsResult`, `AdoptResult`, `StatusReport`, `GenerateResult`, `ValidateResult`, `MigratorLogger`, `AuditLogEntry` |
+| `@dugstack/drizzle-migrator` | `createMigrator`, `Migrator`, `defineMigration`, `defineConfig`, types: `Migration`, `MigrationContext<TFiles>`, `RunSqlFileRange`, `MigratorConfig`, `RunMigrationsResult`, `AdoptResult`, `StatusReport`, `GenerateResult`, `MigrationEntriesValidationResult`, `MigratorLogger`, `AuditLogEntry` |
 | `@dugstack/drizzle-migrator/pg` | `pgDialect`, `PgDialect` |
 | `@dugstack/drizzle-migrator/mysql` | `mysqlDialect`, `MysqlDialect` |
 | `@dugstack/drizzle-migrator/sqlite` | `sqliteDialect`, `SqliteDialect` |

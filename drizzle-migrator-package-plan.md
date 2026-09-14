@@ -513,13 +513,15 @@ createMigrator<D extends DialectAdapter<any, any>>(options: {
 defineMigration<TFiles extends readonly string[]>(migration: MigrationInput<TFiles>): Migration<TFiles>;
 defineConfig(config: MigratorConfigInput): MigratorConfig;
 // types: Migrator, Migration, MigrationContext<TFiles>, RunSqlFileRange, MigratorConfig,
-//        RunMigrationsResult, AdoptResult, StatusReport, GenerateResult, ValidateResult,
+//        RunMigrationsResult, AdoptResult, StatusReport, GenerateResult,
+//        MigrationEntriesValidationResult,
 //        MigratorLogger, AuditLogEntry
 ```
 
 `Migrator<TDb, TTx>` binds dialect, config, and migrations at construction. Public methods:
 `runMigrations({ db, dryRun? })`, `adoptMigrations({ db, from?, to?, force?, confirmDatabase })`,
-`getStatus({ db })`, `validate()`, `generateMigrationEntry({ version?, name?, yes?, register? })`,
+`getStatus({ db })`, `validateMigrationEntries()`,
+`generateMigrationEntry({ version?, name?, yes?, register? })`,
 and `createCli({ connect })`. Engine and CLI free functions remain internal. A database handle
 incompatible with selected dialect fails typechecking.
 

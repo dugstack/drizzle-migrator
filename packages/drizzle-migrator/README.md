@@ -307,7 +307,8 @@ LIMIT 20;
 
 - `@dugstack/drizzle-migrator` — `createMigrator`, `Migrator`, `defineMigration`,
   `defineConfig`, plus `Migration`, `MigrationContext`, `RunSqlFileRange`, `MigratorConfig`,
-  `RunMigrationsResult`, `AdoptResult`, `StatusReport`, `GenerateResult`, `ValidateResult`,
+  `RunMigrationsResult`, `AdoptResult`, `StatusReport`, `GenerateResult`,
+  `MigrationEntriesValidationResult`,
   `MigratorLogger`, and `AuditLogEntry` types.
 - `@dugstack/drizzle-migrator/pg` — `pgDialect`, `PgDialect`.
 - `@dugstack/drizzle-migrator/mysql` — `mysqlDialect`, `MysqlDialect`.

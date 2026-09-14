@@ -8,7 +8,7 @@ import type { Migration } from "./migration.js";
 import { validateRegistry } from "./registry.js";
 import type { AdoptResult, RunMigrationsResult, StatusReport } from "./result.js";
 
-export type ValidateResult = { ok: boolean; errors: string[] };
+export type MigrationEntriesValidationResult = { ok: boolean; errors: string[] };
 
 export interface Migrator<TDb, _TTx> {
   runMigrations(options: { db: TDb; dryRun?: boolean }): Promise<RunMigrationsResult>;
@@ -20,7 +20,8 @@ export interface Migrator<TDb, _TTx> {
     confirmDatabase: string;
   }): Promise<AdoptResult>;
   getStatus(options: { db: TDb }): Promise<StatusReport>;
-  validate(): Promise<ValidateResult>;
+  /** Validates every migration entry and its required on-disk files and folders. */
+  validateMigrationEntries(): Promise<MigrationEntriesValidationResult>;
   generateMigrationEntry(options: {
     version?: string;
     name?: string;
@@ -63,7 +64,7 @@ export function createMigrator<D extends DialectAdapter<any, any>>(options: {
         confirmDatabase,
       }),
     getStatus: ({ db }) => getStatus({ db, adapter: dialect, config, migrations }),
-    async validate() {
+    async validateMigrationEntries() {
       try {
         await validateRegistry(migrations, config);
         return { ok: true, errors: [] };
