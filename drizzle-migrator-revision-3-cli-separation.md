@@ -19,7 +19,7 @@ output, sets exit codes, reads stdin, opens connections, or ships CLI guidance.
 
 `@dugstack/drizzle-migrator-cli` owns command definitions, flag parsing, usage text, prompts,
 rendering, exit codes, configuration discovery, migration discovery, and Postgres connection
-lifecycle. Delete `packages/drizzle-migrator/src/core/cli.ts` and remove
+lifecycle. Delete `packages/core/src/core/cli.ts` and remove
 `Migrator.createCli`.
 
 Keep command names and flags unchanged:

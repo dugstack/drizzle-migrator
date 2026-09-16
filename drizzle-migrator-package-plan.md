@@ -77,7 +77,7 @@ drizzle-migrator/                  # repo root — private, never published
   package.json                     # private root: shared scripts + devDeps, changesets
   biome.json                       # lint + format (single tool, keep it simple)
   .github/workflows/
-    ci.yml                         # path-filtered: lib CI only on packages/drizzle-migrator/**
+    ci.yml                         # path-filtered: lib CI only on packages/core/**
     release.yml                    # changesets version + npm publish --provenance
   apps/
     docs/                          # RESERVED workspace slot — not built in v1 (§2).
@@ -149,7 +149,7 @@ drizzle-migrator/                  # repo root — private, never published
         pg.integration.test.ts     # full testcontainers path (migrate / status / generate / validate)
 ```
 
-### `package.json` essentials (lives at `packages/drizzle-migrator/package.json`)
+### `package.json` essentials (lives at `packages/core/package.json`)
 
 ```jsonc
 {
@@ -192,7 +192,7 @@ Rules:
 - Build with **tsup** (ESM output only, `dts: true`, per-entry files so subpaths resolve).
 - `drizzle-orm` and `pg` are **peer dependencies only**. CI must run the integration suite against
   a matrix of at least two drizzle-orm minor versions to prove the peer range.
-- Publish with `npm publish --access public --provenance` **from `packages/drizzle-migrator`
+- Publish with `npm publish --access public --provenance` **from `packages/core`
   only**. Versioning via **changesets** at the repo root.
 
 **Repo shape (decided): a pnpm-workspace monorepo from day one.** Rationale: a docs website is
@@ -200,15 +200,15 @@ anticipated to be needed ASAP if the package gains traction, and restructuring a
 mid-life is riskier than reserving the slot now. Rules:
 
 - The root is private tooling only — it never publishes. The published units are
-  `packages/drizzle-migrator` (one version line, subpath exports) and, since Revision 2, its
-  companion executable `packages/drizzle-migrator-cli` (§7 "CLI package"); the core remains the
+  `packages/core` (one version line, subpath exports) and, since Revision 2, its
+  companion executable `packages/cli` (§7 "CLI package"); the core remains the
   single source of engine semantics.
 - `apps/docs/` exists as a **reserved, empty workspace** in v1 (see §2): only a minimal private
   `package.json`. When the website is built, it lands there as **Astro + Starlight** reading the
   README/plan content — no restructuring, no moves, instant flip.
 - Do **not** add turborepo/nx for two workspaces; plain pnpm scripts suffice. Revisit only if
   more heavy units appear.
-- CI is path-filtered: lib build/test/publish triggers only on `packages/drizzle-migrator/**`
+- CI is path-filtered: lib build/test/publish triggers only on `packages/core/**`
   and workflow files, so website work never gates the package.
 - Future dialect packages (if ever versioned independently) would join as sibling `packages/*` —
   the adapter seam (§9) already allows it. Until then, dialects stay subpaths of the one package.
@@ -757,7 +757,7 @@ pg integration (testcontainers):
 ## 11. Milestones
 
 1. **Scaffold**: pnpm-workspace monorepo (private root, reserved `apps/docs` slot), the
-   `packages/drizzle-migrator` package, tsconfig (strict, ESM), tsup multi-entry build, biome,
+   `packages/core` package, tsconfig (strict, ESM), tsup multi-entry build, biome,
    vitest, path-filtered CI skeleton.
 2. **Core engine**: types, defineMigration generics, registry validation, sql.ts, engine.ts against
    the fake adapter. Unit tests green.
@@ -779,7 +779,7 @@ pg integration (testcontainers):
 
 ## 12. Acceptance criteria
 
-- [ ] The repo is a pnpm-workspace monorepo: private root, `packages/drizzle-migrator` as the only
+- [ ] The repo is a pnpm-workspace monorepo: private root, `packages/core` as the only
       publishable unit, `apps/docs` reserved (empty, private), CI path-filtered to the package,
       publish runs from the package folder with provenance.
 - [ ] `npm i @dugstack/drizzle-migrator pg drizzle-orm` + a ~20-line bin script that constructs
@@ -846,7 +846,7 @@ it is treated as part of the library's public surface, with the same care as the
 **Location and distribution (Revision 3): the skill belongs to the CLI package** — it documents
 commands, which are CLI-owned:
 
-- Lives at `packages/drizzle-migrator-cli/skills/drizzle-migrator/SKILL.md`, shipped in the CLI
+- Lives at `packages/cli/skills/drizzle-migrator/SKILL.md`, shipped in the CLI
   npm tarball via `files: ["dist", "skills"]` (the core package ships `files: ["dist"]` only).
 - The skill directory is named `drizzle-migrator` (not `db-migration`) so it never collides with
   an app's own database skill when installed alongside it.

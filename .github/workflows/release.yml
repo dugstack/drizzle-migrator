@@ -1,13 +1,5 @@
-# RELEASE PIPELINE — GATED OFF. Nothing here publishes anything while `if: false` is set.
-#
-# This is the intended changesets + provenance flow per plan §3 / §11 (Milestone 6). Enable it
-# ONLY after all of the following exist:
-#
-#   1. The npm scope is set (@dugstack). Confirm it is the final scope before enabling.
-#   2. An NPM_TOKEN repository secret (automation token with publish rights for the scope).
-#   3. The changesets "Version Packages" PR flow (changesets/action, wired below).
-#   4. For the 0.1.0 alpha specifically: add `--tag alpha` to the publish command (or publish
-#      the tagged version manually) so the alpha does not become `latest`.
+# RELEASE PIPELINE — publishes alpha releases through changesets and npm provenance.
+# The initial 0.1.0 alpha uses workflow_dispatch because no changeset exists before first publish.
 #
 # Publishing rules from the plan: versioning via changesets at the repo root; `pnpm -r publish
 # --access public --provenance` publishes both @dugstack packages (private workspaces are
@@ -18,6 +10,13 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      publishInitialAlpha:
+        description: "Publish current package versions under npm dist-tag alpha"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -25,7 +24,6 @@ permissions:
 
 jobs:
   release:
-    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,11 +45,19 @@ jobs:
         run: pnpm -r build
 
       - name: Version or publish
+        if: github.event_name != 'workflow_dispatch' || !inputs.publishInitialAlpha
         uses: changesets/action@v1
         with:
           version: pnpm changeset version
-          publish: pnpm -r publish --access public --provenance
+          publish: pnpm -r publish --access public --provenance --tag alpha
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish initial alpha
+        if: github.event_name == 'workflow_dispatch' && inputs.publishInitialAlpha
+        run: pnpm -r publish --access public --provenance --tag alpha
+        env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

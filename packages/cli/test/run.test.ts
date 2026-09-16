@@ -165,7 +165,8 @@ describe("runCli", () => {
     );
     await runCli(["validate"]);
     expect(process.exitCode).toBe(1);
-    expect(errorOutput()).toMatch(/ECONNREFUSED|error|timeout/s);
+    // Sandboxes can deny loopback sockets with EPERM before a TCP refusal occurs.
+    expect(errorOutput()).toMatch(/ECONNREFUSED|EPERM|error|timeout/s);
   });
 
   it("exits 1 with the reasons when validate finds a broken registry", async () => {

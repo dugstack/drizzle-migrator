@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - "packages/drizzle-migrator/**"
-      - "packages/drizzle-migrator-cli/**"
+      - "packages/core/**"
+      - "packages/cli/**"
       - ".github/workflows/ci.yml"
   pull_request:
     paths:
-      - "packages/drizzle-migrator/**"
-      - "packages/drizzle-migrator-cli/**"
+      - "packages/core/**"
+      - "packages/cli/**"
       - ".github/workflows/ci.yml"
 
 jobs:

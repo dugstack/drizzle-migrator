@@ -200,7 +200,7 @@ File by file (everything exists as a compiling stub from Milestone 1):
 - [ ] Type test: `@ts-expect-error` — passing a non-`NodePgDatabase` value to
       `pgMigrator.runMigrations({ db })` fails compilation (this test must fail to compile if the
       inference regresses; CI's `tsc --noEmit` enforces it — see base plan §10 rule).
-- [ ] `npm publish --dry-run` from `packages/drizzle-migrator` still shows only
+- [ ] `npm publish --dry-run` from `packages/core` still shows only
       `dist/`, `skills/`, README, LICENSE.
 - [ ] Skill placeholder untouched; skill-sync test (when written in Milestone 2) will diff the
       unchanged command table.

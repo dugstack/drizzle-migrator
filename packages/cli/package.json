@@ -20,7 +20,7 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "test:integration": "vitest run --dir test --include 'pg.integration.test.ts'",
+    "test:integration": "vitest run test/pg.integration.test.ts",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit"
   },

@@ -3,7 +3,7 @@
 | | |
 | --- | --- |
 | **Applies to** | The repo that completed Milestones 1–6 of `drizzle-migrator-package-plan.md` (core shipped, README + skill + release pipeline in place) |
-| **Adds** | `packages/drizzle-migrator-cli` — the executable `migrator` command: config discovery, migration-folder auto-discovery, drizzle-out resolution, and pg connection wiring |
+| **Adds** | `packages/cli` — the executable `migrator` command: config discovery, migration-folder auto-discovery, drizzle-out resolution, and pg connection wiring |
 | **Does NOT change** | The core engine, adapter seam, CLI command/flag table, tracking schemas, typed-sqlFiles contract, `defineMigration`, or any existing `Migrator` method signature (one additive optional parameter excepted, below) |
 
 **Meta-rule:** same as Revision 1 — this document is a change order, and its base-plan edits
@@ -63,7 +63,7 @@ packages/
 
 ## 2. Exact type specifications
 
-### CLI config (`packages/drizzle-migrator-cli/src/config.ts`)
+### CLI config (`packages/cli/src/config.ts`)
 
 ```ts
 export type MigratorCliConfigInput = PostgresCliConfigInput; // discriminated by `dialect`
@@ -187,7 +187,7 @@ the core's `CLI_COMMANDS` — the same mechanism as the core's skill-sync test.
 
 ## 7. Base-plan sync (applied to `drizzle-migrator-package-plan.md`)
 
-1. **§3 tree** — added the `packages/drizzle-migrator-cli` block (src + test file list).
+1. **§3 tree** — added the `packages/cli` block (src + test file list).
 2. **§3 repo-shape rules** — the published-units bullet now names both packages.
 3. **§7** — added the "CLI package" subsection (config shape, resolution rules, discovery rules,
    pg wiring, additive `argv` note, usage-sync mechanism).

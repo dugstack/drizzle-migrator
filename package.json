@@ -1,5 +1,5 @@
 {
-  "name": "drizzle-migrator-monorepo",
+  "name": "drizzle-migrator",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
     "typecheck": "pnpm -r typecheck",
     "changeset": "changeset",
     "changeset:version": "changeset version",
-    "changeset:publish": "pnpm -r publish --access public --provenance"
+    "changeset:publish": "pnpm -r publish --access public --provenance --tag alpha"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
