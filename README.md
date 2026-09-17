@@ -7,13 +7,13 @@ A standalone, config-driven database migration orchestrator for [Drizzle ORM](ht
 projects. The drizzle client is injected by the consumer; dialect-specific behavior lives behind
 subpath exports: `/pg`, `/mysql`, `/sqlite`.
 
-- **Full specification:** [`drizzle-migrator-package-plan.md`](./drizzle-migrator-package-plan.md)
+- **Full specification:** [`drizzle-migrator-package-plan.md`](./agent-implementation-docs/drizzle-migrator-package-plan.md)
 - **Package (core + adapters):** [`packages/core`](./packages/core) — a
   pure programmatic service (no CLI)
 - **Package (executable):** [`packages/cli`](./packages/cli) —
   the `migrator` command: sole CLI owner (command table, dispatch, prompts, usage), config and
   migration auto-discovery, Postgres wiring, and the bundled agent skill
-  ([Revision 3](./drizzle-migrator-revision-3-cli-separation.md))
+  ([Revision 3](./agent-implementation-docs/drizzle-migrator-revision-3-cli-separation.md))
 - **Docs website:** reserved, empty slot at [`apps/docs`](./apps/docs) (not built in v1, see plan §2)
 
 ## Status
