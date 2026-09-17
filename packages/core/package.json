@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "type": "module",
   "license": "MIT",
+  "repository": "git+https://github.com/dugstack/drizzle-migrator.git",
+  "bugs": "https://github.com/dugstack/drizzle-migrator/issues",
+  "homepage": "https://github.com/dugstack/drizzle-migrator#readme",
   "engines": {
     "node": ">=20"
   },

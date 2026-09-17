@@ -1,28 +1,34 @@
-# `@dugstack/drizzle-migrator`
+# Drizzle Migrator
 
-> **Scope notice.** The npm scope for this package is `@dugstack`. The same scope appears
-> throughout the plan and code.
+Config-driven database migrations for [Drizzle ORM](https://orm.drizzle.team) projects.
 
-A standalone, config-driven database migration orchestrator for [Drizzle ORM](https://orm.drizzle.team)
-projects. The drizzle client is injected by the consumer; dialect-specific behavior lives behind
-subpath exports: `/pg`, `/mysql`, `/sqlite`.
+## Packages
 
-- **Full specification:** [`drizzle-migrator-package-plan.md`](./agent-implementation-docs/drizzle-migrator-package-plan.md)
-- **Package (core + adapters):** [`packages/core`](./packages/core) — a
-  pure programmatic service (no CLI)
-- **Package (executable):** [`packages/cli`](./packages/cli) —
-  the `migrator` command: sole CLI owner (command table, dispatch, prompts, usage), config and
-  migration auto-discovery, Postgres wiring, and the bundled agent skill
-  ([Revision 3](./agent-implementation-docs/drizzle-migrator-revision-3-cli-separation.md))
-- **Docs website:** reserved, empty slot at [`apps/docs`](./apps/docs) (not built in v1, see plan §2)
+| Package | Purpose |
+| --- | --- |
+| [`@dugstack/drizzle-migrator`](./packages/core) | Programmatic migration service and dialect adapters. |
+| [`@dugstack/drizzle-migrator-cli`](./packages/cli) | `migrator` executable, configuration discovery, prompts, and Postgres wiring. |
 
-## Status
+## Install
 
-**Milestone 6 — hardening complete; Revision 3 (CLI separation) implemented.** The core package
-is a pure programmatic service (`runMigrations`, `adoptMigrations`, `getStatus`,
-`validateMigrationEntries`, `suggestMigrationEntry`, `generateMigrationEntry`,
-`appendAuditEvent`); the `@dugstack/drizzle-migrator-cli` executable owns the entire command
-surface — the single command table, argv parsing, prompts, usage, output, exit codes, optional
-Postgres configuration, and the bundled agent skill (`skills/drizzle-migrator/SKILL.md`,
-test-synced against the CLI command table). Changesets and the provenance release pipeline are
-wired for alpha releases. Initial publishing requires a manual workflow dispatch and `NPM_TOKEN`.
+```sh
+pnpm add @dugstack/drizzle-migrator@alpha
+pnpm add -D @dugstack/drizzle-migrator-cli@alpha
+```
+
+Read each package README for setup and API guidance.
+
+## Development
+
+```sh
+pnpm install
+pnpm -r build
+pnpm -r typecheck
+pnpm -r lint
+pnpm -r test
+```
+
+## Implementation docs
+
+Implementation plans and revision records live in
+[`agent-implementation-docs`](./agent-implementation-docs).
