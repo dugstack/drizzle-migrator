@@ -36,7 +36,7 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "drizzle-orm": ">=0.36.0",
+    "drizzle-orm": "0.45.2",
     "pg": ">=8.0.0"
   },
   "peerDependenciesMeta": {
@@ -48,7 +48,7 @@
     "@testcontainers/postgresql": "^10",
     "@types/node": "^22",
     "@types/pg": "^8",
-    "drizzle-orm": "^0.45.0",
+    "drizzle-orm": "0.45.2",
     "pg": "^8",
     "tsup": "^8",
     "typescript": "^5.7",

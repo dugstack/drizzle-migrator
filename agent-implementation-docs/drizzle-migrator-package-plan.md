@@ -173,13 +173,13 @@ drizzle-migrator/                  # repo root — private, never published
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "drizzle-orm": ">=0.36.0",
+    "drizzle-orm": "0.45.2",
     "pg": ">=8.0.0"
   },
   "peerDependenciesMeta": { "pg": { "optional": true } },
   "devDependencies": {
     "tsup": "^8", "typescript": "^5.7", "vitest": "^3",
-    "@testcontainers/postgresql": "^10", "drizzle-orm": "^0.45.0", "pg": "^8", "@types/pg": "^8"
+    "@testcontainers/postgresql": "^10", "drizzle-orm": "0.45.2", "pg": "^8", "@types/pg": "^8"
   }
 }
 ```
