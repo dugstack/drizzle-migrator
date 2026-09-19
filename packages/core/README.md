@@ -1,14 +1,11 @@
 # `@dugstack/drizzle-migrator`
 
-> **Scope notice.** The npm scope for this package is `@dugstack` — it appears throughout the
-> docs, examples, and the generated migration entries.
-
 A standalone, config-driven database migration orchestrator for [Drizzle ORM](https://orm.drizzle.team)
 projects. The drizzle client is injected by the consumer; dialect-specific behavior lives behind
 subpath exports: [`/pg`](#dialects), `/mysql`, `/sqlite`. It is a pure programmatic service: no
 argv parsing, no output, no exit codes, no connections — the companion
-[`@dugstack/drizzle-migrator-cli`](../drizzle-migrator-cli/README.md) package owns the
-`migrator` executable.
+[`@dugstack/drizzle-migrator-cli`](../cli/README.md) package owns the
+`drizzle-migrator` executable.
 
 ## Why not drizzle's built-in `migrate()`?
 
@@ -40,16 +37,16 @@ This package fixes all four:
 
 Two ways to consume the migrator:
 
-- **CLI executable** — install both packages and skip the bin script entirely:
+- **CLI executable** — install the CLI package and skip the bin script entirely:
 
   ```sh
-  npm i @dugstack/drizzle-migrator @dugstack/drizzle-migrator-cli
+  npm i @dugstack/drizzle-migrator-cli
   ```
 
-  The companion package ships the `migrator` executable: it owns command dispatch, flag
+  The companion package ships the `drizzle-migrator` executable: it owns command dispatch, flag
   parsing, prompts, and usage, discovers your config, auto-discovers migration folders, and
   owns the pg connection wiring (see [Quick start — CLI executable](#quick-start--cli-executable)
-  and the [CLI README](../drizzle-migrator-cli/README.md)).
+  and the [CLI README](../cli/README.md)).
 
 - **Programmatic only** — install the core and call the service methods from your own tooling:
 
@@ -76,15 +73,15 @@ export default {
 
 ```sh
 pnpm drizzle-kit generate       # SQL files land in ./drizzle
-pnpm migrator generate --yes    # scaffolds v<next>/index.ts from unapplied SQL files
-pnpm migrator migrate           # applies pending migrations
-pnpm migrator status --json
+pnpm exec drizzle-migrator generate --yes    # scaffolds v<next>/index.ts from unapplied SQL files
+pnpm exec drizzle-migrator migrate           # applies pending migrations
+pnpm exec drizzle-migrator status --json
 ```
 
 Migration entries are auto-discovered from `<migratorOutDir>/v<semver>/index.ts` — no manual
 registry file. `postgres` configuration is optional: `generate` and `validate` run without it,
 while `migrate`, `adopt`, and `status` require it and fail before any connection attempt
-otherwise. Full reference: the [CLI package README](../drizzle-migrator-cli/README.md).
+otherwise. Full reference: the [CLI package README](../cli/README.md).
 
 ## Quick start — programmatic core
 
@@ -226,7 +223,7 @@ A migration attempt is reconstructed as: event `run.started` with no matching `r
 
 ## Commands
 
-Commands belong to the [`migrator` executable](../drizzle-migrator-cli/README.md), which defines,
+Commands belong to the [`drizzle-migrator` executable](../cli/README.md), which defines,
 renders, and validates them from a single command table:
 
 | command | flags | notes |

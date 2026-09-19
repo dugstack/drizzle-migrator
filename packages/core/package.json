@@ -1,9 +1,12 @@
 {
   "name": "@dugstack/drizzle-migrator",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "license": "MIT",
-  "repository": "git+https://github.com/dugstack/drizzle-migrator.git",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dugstack/drizzle-migrator.git"
+  },
   "bugs": "https://github.com/dugstack/drizzle-migrator/issues",
   "homepage": "https://github.com/dugstack/drizzle-migrator#readme",
   "engines": {

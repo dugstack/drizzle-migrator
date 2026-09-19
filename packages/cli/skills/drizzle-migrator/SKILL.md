@@ -1,11 +1,11 @@
 ---
 name: drizzle-migrator-cli
-description: Operating manual for @dugstack/drizzle-migrator-cli — how AI agents use the migrator executable to add, register, run, verify, and adopt Drizzle ORM migrations safely. Read this before touching any migration files.
+description: Operating manual for @dugstack/drizzle-migrator-cli — how AI agents use the drizzle-migrator executable to add, register, run, verify, and adopt Drizzle ORM migrations safely. Read this before touching any migration files.
 ---
 
 # drizzle-migrator-cli — agent operating manual
 
-The `migrator` executable (npm `@dugstack/drizzle-migrator-cli`) for the
+The `drizzle-migrator` executable (npm `@dugstack/drizzle-migrator-cli`) for the
 `@dugstack/drizzle-migrator` core. The app owns a `drizzle-migrator.config.ts`, version folders,
 and SQL files produced by `drizzle-kit generate`; the CLI discovers all of them and owns every
 command, prompt, and the Postgres connection, while the core engine keeps the guarantees this
@@ -29,7 +29,7 @@ Before touching migrations, read, in order:
 
 1. Edit the app's drizzle schema and run `drizzle-kit generate` — generating SQL is the app's
    job; this package never writes SQL files.
-2. Run the migrator CLI's `generate` command to scaffold `v<next>/index.ts` from the unapplied
+2. Run the drizzle-migrator CLI's `generate` command to scaffold `v<next>/index.ts` from the unapplied
    SQL files in `sqlDir`.
 3. Register the entry: pass `--register`, or paste the printed snippet into the registry.
 4. Run the app's typecheck.

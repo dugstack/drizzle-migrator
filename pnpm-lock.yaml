@@ -20,8 +20,8 @@ importers:
   packages/cli:
     dependencies:
       '@dugstack/drizzle-migrator':
-        specifier: workspace:^
-        version: link:../core
+        specifier: ^0.1.0
+        version: 0.1.0(drizzle-orm@0.45.2(@types/pg@8.23.1)(pg@8.23.0))(pg@8.23.0)
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)
@@ -194,6 +194,16 @@ packages:
 
   '@changesets/write@0.4.0':
     resolution: {integrity: sha512-CdTLvIOPiCNuH71pyDu3rA+Q0n65cmAbXnwWH84rKGiFumFzkmHNT8KHTMEchcxN+Kl8I54xGUhJ7l3E7X396Q==}
+
+  '@dugstack/drizzle-migrator@0.1.0':
+    resolution: {integrity: sha512-mRi4hTlODf1Hg/PeGJPFB1Kk0QOS4IKukzTWaPngRYY1tePfXxK/bbyK0Fa4cyhRQ21qhLy+qWbKEVhEJ/zNZw==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      drizzle-orm: 0.45.2
+      pg: '>=8.0.0'
+    peerDependenciesMeta:
+      pg:
+        optional: true
 
   '@esbuild/aix-ppc64@0.27.7':
     resolution: {integrity: sha512-EKX3Qwmhz1eMdEJokhALr0YiD0lhQNwDqkPYyPhiSwKrh7/4KRjQc04sZ8db+5DVVnZ1LmbNDI1uAMPEUBnQPg==}
@@ -2215,6 +2225,12 @@ snapshots:
       fs-extra: 7.0.1
       human-id: 4.2.1
       prettier: 2.8.8
+
+  '@dugstack/drizzle-migrator@0.1.0(drizzle-orm@0.45.2(@types/pg@8.23.1)(pg@8.23.0))(pg@8.23.0)':
+    dependencies:
+      drizzle-orm: 0.45.2(@types/pg@8.23.1)(pg@8.23.0)
+    optionalDependencies:
+      pg: 8.23.0
 
   '@esbuild/aix-ppc64@0.27.7':
     optional: true

@@ -24,19 +24,22 @@ export type CliCommandSpec = {
 export const CLI_COMMANDS: readonly CliCommandSpec[] = [
   {
     name: "migrate",
-    description: "apply pending migrations; the only command a deploy pipeline runs",
+    description:
+      "apply pending migrations; the only command a deploy pipeline runs",
     requiresDatabase: true,
     flags: [
       {
         name: "dry-run",
         type: "boolean",
-        description: "print the statements that would run without executing anything",
+        description:
+          "print the statements that would run without executing anything",
       },
     ],
   },
   {
     name: "adopt",
-    description: "record an existing database as already-migrated without executing SQL",
+    description:
+      "record an existing database as already-migrated without executing SQL",
     requiresDatabase: true,
     flags: [
       {
@@ -44,7 +47,11 @@ export const CLI_COMMANDS: readonly CliCommandSpec[] = [
         type: "value",
         description: "first version to adopt (default: registry first)",
       },
-      { name: "to", type: "value", description: "last version to adopt (default: registry last)" },
+      {
+        name: "to",
+        type: "value",
+        description: "last version to adopt (default: registry last)",
+      },
       {
         name: "force",
         type: "boolean",
@@ -59,18 +66,34 @@ export const CLI_COMMANDS: readonly CliCommandSpec[] = [
   },
   {
     name: "status",
-    description: "show the current version, applied and pending migrations, recent audit logs",
+    description:
+      "show the current version, applied and pending migrations, recent audit logs",
     requiresDatabase: true,
-    flags: [{ name: "json", type: "boolean", description: "print the status report as JSON" }],
+    flags: [
+      {
+        name: "json",
+        type: "boolean",
+        description: "print the status report as JSON",
+      },
+    ],
   },
   {
     name: "generate",
-    description: "scaffold a new migration entry from unapplied SQL files in sqlDir",
+    description:
+      "scaffold a new migration entry from unapplied SQL files in sqlDir",
     requiresDatabase: false,
     flags: [
-      { name: "version", type: "value", description: "skip the version prompt" },
+      {
+        name: "version",
+        type: "value",
+        description: "skip the version prompt",
+      },
       { name: "name", type: "value", description: "skip the name prompt" },
-      { name: "yes", type: "boolean", description: "skip all prompts and use every default" },
+      {
+        name: "yes",
+        type: "boolean",
+        description: "skip all prompts and use every default",
+      },
       {
         name: "register",
         type: "boolean",
@@ -80,7 +103,8 @@ export const CLI_COMMANDS: readonly CliCommandSpec[] = [
   },
   {
     name: "validate",
-    description: "lint the migration registry: versions, duplicates, sqlFiles, file existence",
+    description:
+      "lint the migration registry: versions, duplicates, sqlFiles, file existence",
     requiresDatabase: false,
     flags: [],
   },
@@ -102,7 +126,9 @@ export function parseCommandArgv(argv: readonly string[]): ParsedCommandArgv {
       continue;
     }
     if (!arg.startsWith("--")) {
-      throw new Error(`unexpected argument "${arg}" — only --flags are accepted`);
+      throw new Error(
+        `unexpected argument "${arg}" — only --flags are accepted`,
+      );
     }
     const body = arg.slice(2);
     if (body.length === 0) {
@@ -134,7 +160,8 @@ export function redactFlags(
   const redacted: Record<string, string | boolean> = {};
   for (const [key, value] of Object.entries(flags)) {
     redacted[key] =
-      typeof value === "string" && /password|secret|token|api[-_]?key/i.test(key)
+      typeof value === "string" &&
+      /password|secret|token|api[-_]?key/i.test(key)
         ? "[redacted]"
         : value;
   }
@@ -158,6 +185,7 @@ export function validateCommandFlags(
       );
     }
   }
+
   for (const flag of spec.flags) {
     const value = flags[flag.name];
     if (value === undefined) {
@@ -167,7 +195,9 @@ export function validateCommandFlags(
       throw new Error(`flag "--${flag.name}" takes no value`);
     }
     if (flag.type === "value" && typeof value !== "string") {
-      throw new Error(`flag "--${flag.name}" requires a value (--${flag.name}=<value>)`);
+      throw new Error(
+        `flag "--${flag.name}" requires a value (--${flag.name}=<value>)`,
+      );
     }
   }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@dugstack/drizzle-migrator-cli",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "license": "MIT",
   "repository": "git+https://github.com/dugstack/drizzle-migrator.git",
@@ -9,7 +9,7 @@
   "engines": {
     "node": ">=20"
   },
-  "description": "Executable `migrator` command for @dugstack/drizzle-migrator: owns the command dispatch, flag parsing, prompts, usage, bundled agent skill, config discovery, migration auto-discovery, and Postgres connection wiring.",
+  "description": "Executable `drizzle-migrator` command for @dugstack/drizzle-migrator: owns the command dispatch, flag parsing, prompts, usage, bundled agent skill, config discovery, migration auto-discovery, and Postgres connection wiring.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -17,7 +17,7 @@
     }
   },
   "bin": {
-    "migrator": "./dist/bin.js"
+    "drizzle-migrator": "./dist/bin.js"
   },
   "files": ["dist", "skills"],
   "scripts": {
@@ -28,7 +28,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dugstack/drizzle-migrator": "workspace:^",
+    "@dugstack/drizzle-migrator": "^0.1.0",
     "drizzle-orm": "0.45.2",
     "jiti": "^2.6.0",
     "pg": "^8"

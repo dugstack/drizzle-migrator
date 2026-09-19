@@ -121,7 +121,7 @@ drizzle-migrator/                  # repo root — private, never published
         types.test.ts              # expectTypeOf guards for the typed sqlFiles contract
     drizzle-migrator-cli/          # the executable — sole CLI owner (Revision 3): command table,
                                    # dispatch, flag parsing, prompts, usage, skills, pg wiring
-      package.json                 # @dugstack/drizzle-migrator-cli; bin: migrator -> ./dist/bin.js
+      package.json                 # @dugstack/drizzle-migrator-cli; bin: drizzle-migrator -> ./dist/bin.js
       skills/
         drizzle-migrator/         # bundled agent skill — a first-class, shipped artifact (see §15)
           SKILL.md

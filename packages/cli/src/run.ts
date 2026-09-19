@@ -356,7 +356,7 @@ async function executeCommand(context: CommandContext): Promise<void> {
 }
 
 /**
- * Runs the `migrator` executable. The CLI owns everything argv-shaped (global
+ * Runs the `drizzle-migrator` executable. The CLI owns everything argv-shaped (global
  * flags, command parsing, flag validation) plus output, exit codes, prompts,
  * and the Postgres connection lifecycle; the core package is a pure
  * programmatic service that receives only structured calls.

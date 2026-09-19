@@ -6,7 +6,7 @@ import { CLI_COMMANDS } from "./commands.js";
  * no mirrored copy to keep in sync anymore.
  */
 export function printUsage(logger: MigratorLogger): void {
-  logger.info("Usage: migrator [--config=<path>] <command> [flags]");
+  logger.info("Usage: drizzle-migrator [--config=<path>] <command> [flags]");
   logger.info("Global flags:");
   logger.info("  --config=<path>");
   logger.info("      path to the migrator config (default: ./drizzle-migrator.config.ts)");

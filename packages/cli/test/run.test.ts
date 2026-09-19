@@ -97,7 +97,9 @@ describe("runCli", () => {
     process.chdir(await newFixture("run-help")); // no config file here
     await runCli(["--help"]);
     expect(process.exitCode).toBe(0);
-    expect(infoOutput()).toMatch(/^Usage: migrator \[--config=<path>\] <command> \[flags\]/);
+    expect(infoOutput()).toMatch(
+      /^Usage: drizzle-migrator \[--config=<path>\] <command> \[flags\]/,
+    );
 
     process.exitCode = 0;
     infoSpy.mockClear();

@@ -1,25 +1,25 @@
 # `@dugstack/drizzle-migrator-cli`
 
-The executable `migrator` command for [`@dugstack/drizzle-migrator`](../drizzle-migrator). One
+The executable `drizzle-migrator` command for [`@dugstack/drizzle-migrator`](../core). One
 config file, no registry files, no bin script — the CLI discovers everything, owns the Postgres
 connection wiring, and owns the entire command surface: dispatch, flag parsing, prompts, usage
 text, output rendering, and exit codes. The core package is a pure programmatic service.
 
 ```sh
-pnpm migrator generate
-pnpm migrator migrate
-pnpm migrator --config ./db/migrator.config.ts status
+pnpm exec drizzle-migrator generate
+pnpm exec drizzle-migrator migrate
+pnpm exec drizzle-migrator --config ./db/migrator.config.ts status
 ```
 
 ## Install
 
 ```sh
-npm i -D @dugstack/drizzle-migrator-cli @dugstack/drizzle-migrator
+npm i -D @dugstack/drizzle-migrator-cli
 ```
 
 The CLI depends on `drizzle-orm`, `pg`, and `jiti` (the TypeScript config loader) directly — no
-extra setup. `migrator` is a `bin` entry: with pnpm, `pnpm exec migrator` or a `"migrator"` script
-alias; with npm, `npx migrator`.
+extra setup. `drizzle-migrator` is a `bin` entry: with pnpm, `pnpm exec drizzle-migrator` or a `"drizzle-migrator"` script
+alias; with npm, `npx @dugstack/drizzle-migrator-cli`.
 
 ### Agent skill
 
@@ -59,13 +59,13 @@ export default {
    a migration:
 
 ```sh
-pnpm migrator generate --yes
+pnpm exec drizzle-migrator generate --yes
 ```
 
 4. **Run it:**
 
 ```sh
-pnpm migrator migrate
+pnpm exec drizzle-migrator migrate
 ```
 
 ## Config reference
@@ -95,7 +95,7 @@ The CLI looks for `drizzle-migrator.config.{ts,mts,cts,js,mjs,cjs}` in the worki
 `--config <path>` overrides it (the extension is appended for you if omitted):
 
 ```sh
-pnpm migrator --config ./db/migrator.config.ts generate
+pnpm exec drizzle-migrator --config ./db/migrator.config.ts generate
 ```
 
 Config and migration entries are loaded through [jiti](https://github.com/unjs/jiti), so they stay
@@ -172,7 +172,7 @@ that single connection — the CLI owns this wiring; the core stays a pure progr
 ## When to use the core package directly
 
 The CLI covers the standard project shape. Reach for the programmatic API
-([`@dugstack/drizzle-migrator`](../drizzle-migrator)) when you need your own bin script, a
+([`@dugstack/drizzle-migrator`](../core)) when you need your own bin script, a
 non-postgres dialect token, or embedded migration runs — `createMigrator({ dialect, config,
 migrations })` plus the `Migrator` service methods (`runMigrations`, `adoptMigrations`,
 `getStatus`, `validateMigrationEntries`, `suggestMigrationEntry`, `generateMigrationEntry`,
