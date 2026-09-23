@@ -24,22 +24,19 @@ export type CliCommandSpec = {
 export const CLI_COMMANDS: readonly CliCommandSpec[] = [
   {
     name: "migrate",
-    description:
-      "apply pending migrations; the only command a deploy pipeline runs",
+    description: "apply pending migrations; the only command a deploy pipeline runs",
     requiresDatabase: true,
     flags: [
       {
         name: "dry-run",
         type: "boolean",
-        description:
-          "print the statements that would run without executing anything",
+        description: "print the statements that would run without executing anything",
       },
     ],
   },
   {
     name: "adopt",
-    description:
-      "record an existing database as already-migrated without executing SQL",
+    description: "record an existing database as already-migrated without executing SQL",
     requiresDatabase: true,
     flags: [
       {
@@ -66,8 +63,7 @@ export const CLI_COMMANDS: readonly CliCommandSpec[] = [
   },
   {
     name: "status",
-    description:
-      "show the current version, applied and pending migrations, recent audit logs",
+    description: "show the current version, applied and pending migrations, recent audit logs",
     requiresDatabase: true,
     flags: [
       {
@@ -79,8 +75,7 @@ export const CLI_COMMANDS: readonly CliCommandSpec[] = [
   },
   {
     name: "generate",
-    description:
-      "scaffold a new migration entry from unapplied SQL files in sqlDir",
+    description: "scaffold a new migration entry from unapplied SQL files in sqlDir",
     requiresDatabase: false,
     flags: [
       {
@@ -103,8 +98,7 @@ export const CLI_COMMANDS: readonly CliCommandSpec[] = [
   },
   {
     name: "validate",
-    description:
-      "lint the migration registry: versions, duplicates, sqlFiles, file existence",
+    description: "lint the migration registry: versions, duplicates, sqlFiles, file existence",
     requiresDatabase: false,
     flags: [],
   },
@@ -126,9 +120,7 @@ export function parseCommandArgv(argv: readonly string[]): ParsedCommandArgv {
       continue;
     }
     if (!arg.startsWith("--")) {
-      throw new Error(
-        `unexpected argument "${arg}" — only --flags are accepted`,
-      );
+      throw new Error(`unexpected argument "${arg}" — only --flags are accepted`);
     }
     const body = arg.slice(2);
     if (body.length === 0) {
@@ -160,8 +152,7 @@ export function redactFlags(
   const redacted: Record<string, string | boolean> = {};
   for (const [key, value] of Object.entries(flags)) {
     redacted[key] =
-      typeof value === "string" &&
-      /password|secret|token|api[-_]?key/i.test(key)
+      typeof value === "string" && /password|secret|token|api[-_]?key/i.test(key)
         ? "[redacted]"
         : value;
   }
@@ -195,9 +186,7 @@ export function validateCommandFlags(
       throw new Error(`flag "--${flag.name}" takes no value`);
     }
     if (flag.type === "value" && typeof value !== "string") {
-      throw new Error(
-        `flag "--${flag.name}" requires a value (--${flag.name}=<value>)`,
-      );
+      throw new Error(`flag "--${flag.name}" requires a value (--${flag.name}=<value>)`);
     }
   }
 }
