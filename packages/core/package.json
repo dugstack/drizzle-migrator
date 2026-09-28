@@ -34,23 +34,29 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "test:integration": "vitest run test/pg.integration.test.ts",
+    "test:integration": "vitest run test/pg.integration.test.ts test/sqlite.integration.test.ts",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "drizzle-orm": "0.45.2",
-    "pg": ">=8.0.0"
+    "pg": ">=8.0.0",
+    "better-sqlite3": ">=9.0.0"
   },
   "peerDependenciesMeta": {
     "pg": {
+      "optional": true
+    },
+    "better-sqlite3": {
       "optional": true
     }
   },
   "devDependencies": {
     "@testcontainers/postgresql": "^10",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22",
     "@types/pg": "^8",
+    "better-sqlite3": "^13.0.3",
     "drizzle-orm": "0.45.2",
     "pg": "^8",
     "tsup": "^8",

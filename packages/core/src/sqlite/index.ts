@@ -1,25 +1,10 @@
 import type { DialectAdapter } from "../core/adapter.js";
+import { type SqliteDatabase, type SqliteTransaction, createSqliteAdapter } from "./adapter.js";
 
-export type SqliteDialect = DialectAdapter<never, never>;
+export type SqliteDialect = DialectAdapter<SqliteDatabase, SqliteTransaction>;
 
-const notImplemented = (): never => {
-  throw new Error("sqlite adapter is not implemented in v1");
-};
+/** SQLite adapter token consumed by createMigrator. */
+export const sqliteDialect: SqliteDialect = createSqliteAdapter();
 
-/** Import-safe SQLite token. Every operation fails at first use. */
-export const sqliteDialect: SqliteDialect = {
-  id: "sqlite",
-  quoteIdentifier: notImplemented,
-  currentDatabaseName: notImplemented,
-  acquireLock: notImplemented,
-  releaseLock: notImplemented,
-  bootstrapTrackingTables: notImplemented,
-  readAppliedVersions: notImplemented,
-  listAppliedVersionRows: notImplemented,
-  recordVersion: notImplemented,
-  appendLog: notImplemented,
-  readLogs: notImplemented,
-  hasAnyTableInDefaultSchema: notImplemented,
-  runInTransaction: notImplemented,
-  executeRaw: notImplemented,
-};
+export { createSqliteAdapter };
+export type { SqliteDatabase, SqliteTransaction };

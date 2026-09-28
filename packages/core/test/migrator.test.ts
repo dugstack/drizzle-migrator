@@ -4,7 +4,6 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createMigrator, defineConfig, defineMigration } from "../src/core/index.js";
 import { mysqlDialect } from "../src/mysql/index.js";
-import { sqliteDialect } from "../src/sqlite/index.js";
 import { createFakeAdapter, createFakeDatabase, createFakeLogger } from "./fake-adapter.js";
 
 async function createFixture() {
@@ -68,16 +67,13 @@ describe("createMigrator", () => {
     });
   });
 
-  it.each([
-    ["mysql", mysqlDialect],
-    ["sqlite", sqliteDialect],
-  ] as const)("keeps %s imports safe and throws from every adapter method", (id, dialect) => {
-    for (const [name, member] of Object.entries(dialect)) {
+  it("keeps mysql imports safe and throws from every adapter method", () => {
+    for (const [name, member] of Object.entries(mysqlDialect)) {
       if (name === "id") {
         continue;
       }
       expect(() => (member as () => unknown)(), name).toThrow(
-        `${id} adapter is not implemented in v1`,
+        "mysql adapter is not implemented in v1",
       );
     }
   });

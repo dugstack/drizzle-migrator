@@ -317,7 +317,18 @@ LIMIT 20;
   `MigratorLogger`, and `AuditLogEntry` types.
 - `@dugstack/drizzle-migrator/pg` — `pgDialect`, `PgDialect`.
 - `@dugstack/drizzle-migrator/mysql` — `mysqlDialect`, `MysqlDialect`.
-- `@dugstack/drizzle-migrator/sqlite` — `sqliteDialect`, `SqliteDialect`.
+- `@dugstack/drizzle-migrator/sqlite` — `sqliteDialect`, `SqliteDialect`, plus `createSqliteAdapter`,
+  `SqliteDatabase`, `SqliteTransaction`.
+
+SQLite notes: the adapter is built on `drizzle-orm/better-sqlite3` (peer dependency
+`better-sqlite3`), so pass it a `drizzle(client)` instance. `config.schema` only participates in
+identifier validation — tracking tables live at the top level of the database file.
+`currentDatabaseName` returns the main database's file path (null for in-memory databases), which
+is the value `--confirm-database` must match. SQLite has no advisory locks: `acquireLock` opens a
+`BEGIN IMMEDIATE` transaction and holds it for the run (the file's single-writer rule is the
+cross-process lock), and `releaseLock` commits it — publishing the entire run (tracking rows
+included) atomically; if the process dies first, journal rollback leaves nothing applied and
+nothing recorded. `runInTransaction` nests via SAVEPOINTs to work inside the held lock.
 
 Dialect tokens carry database types into `createMigrator`; passing a mismatched database handle to
 a bound migrator fails typechecking. Schema and tracking-table identifiers are validated through

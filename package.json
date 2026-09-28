@@ -22,6 +22,6 @@
     "@changesets/cli": "^2.29.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["@biomejs/biome", "esbuild", "cpu-features", "protobufjs", "ssh2"]
+    "onlyBuiltDependencies": ["@biomejs/biome", "better-sqlite3", "esbuild", "cpu-features", "protobufjs", "ssh2"]
   }
 }
