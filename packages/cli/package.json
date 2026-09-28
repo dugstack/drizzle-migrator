@@ -1,6 +1,6 @@
 {
   "name": "@dugstack/drizzle-migrator-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -22,7 +22,10 @@
   "bin": {
     "drizzle-migrator": "dist/bin.js"
   },
-  "files": ["dist", "skills"],
+  "files": [
+    "dist",
+    "skills"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
@@ -31,7 +34,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dugstack/drizzle-migrator": "^0.1.0",
+    "@dugstack/drizzle-migrator": "^0.2.0",
     "drizzle-orm": "0.45.2",
     "jiti": "^2.6.0",
     "pg": "^8"

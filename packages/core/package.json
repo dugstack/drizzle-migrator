@@ -1,6 +1,6 @@
 {
   "name": "@dugstack/drizzle-migrator",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -30,7 +30,9 @@
       "import": "./dist/sqlite/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
