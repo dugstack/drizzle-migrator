@@ -1,6 +1,6 @@
 {
   "name": "@dugstack/drizzle-migrator-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -31,15 +31,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@dugstack/drizzle-migrator": "^0.1.0",
+    "@dugstack/drizzle-migrator": "workspace:^",
     "drizzle-orm": "0.45.2",
     "jiti": "^2.6.0",
     "pg": "^8"
   },
   "devDependencies": {
     "@testcontainers/postgresql": "^10",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22",
     "@types/pg": "^8",
+    "better-sqlite3": "^11.10.0",
     "tsup": "^8",
     "typescript": "^5.7",
     "vitest": "^3"

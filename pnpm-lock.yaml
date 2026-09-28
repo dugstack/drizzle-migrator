@@ -20,11 +20,11 @@ importers:
   packages/cli:
     dependencies:
       '@dugstack/drizzle-migrator':
-        specifier: ^0.1.0
-        version: 0.1.0(drizzle-orm@0.45.2(@types/better-sqlite3@9.6.0)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(pg@8.23.0))(pg@8.23.0)
+        specifier: workspace:^
+        version: link:../core
       drizzle-orm:
         specifier: 0.45.2
-        version: 0.45.2(@types/better-sqlite3@9.6.0)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(pg@8.23.0)
+        version: 0.45.2(@types/better-sqlite3@9.6.0)(@types/pg@8.23.1)(better-sqlite3@11.10.0)(pg@8.23.0)
       jiti:
         specifier: ^2.6.0
         version: 2.7.0
@@ -35,12 +35,18 @@ importers:
       '@testcontainers/postgresql':
         specifier: ^10
         version: 10.28.0
+      '@types/better-sqlite3':
+        specifier: ^9.6.0
+        version: 9.6.0
       '@types/node':
         specifier: ^22
         version: 22.20.1
       '@types/pg':
         specifier: ^8
         version: 8.23.1
+      better-sqlite3:
+        specifier: ^11.10.0
+        version: 11.10.0
       tsup:
         specifier: ^8
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.28)(typescript@5.9.3)(yaml@2.9.0)
@@ -200,16 +206,6 @@ packages:
 
   '@changesets/write@0.4.0':
     resolution: {integrity: sha512-CdTLvIOPiCNuH71pyDu3rA+Q0n65cmAbXnwWH84rKGiFumFzkmHNT8KHTMEchcxN+Kl8I54xGUhJ7l3E7X396Q==}
-
-  '@dugstack/drizzle-migrator@0.1.0':
-    resolution: {integrity: sha512-mRi4hTlODf1Hg/PeGJPFB1Kk0QOS4IKukzTWaPngRYY1tePfXxK/bbyK0Fa4cyhRQ21qhLy+qWbKEVhEJ/zNZw==}
-    engines: {node: '>=20'}
-    peerDependencies:
-      drizzle-orm: 0.45.2
-      pg: '>=8.0.0'
-    peerDependenciesMeta:
-      pg:
-        optional: true
 
   '@esbuild/aix-ppc64@0.27.7':
     resolution: {integrity: sha512-EKX3Qwmhz1eMdEJokhALr0YiD0lhQNwDqkPYyPhiSwKrh7/4KRjQc04sZ8db+5DVVnZ1LmbNDI1uAMPEUBnQPg==}
@@ -945,10 +941,6 @@ packages:
   better-sqlite3@11.10.0:
     resolution: {integrity: sha512-EwhOpyXiOEL/lKzHz9AW1msWFNzGc/z+LzeB3/jnFJpxu+th2yqvzsSWas1v9jgs9+xiXJcD5A8CJxAG2TaghQ==}
 
-  better-sqlite3@13.0.3:
-    resolution: {integrity: sha512-RbOBxmLBG8uvFUc15X9+9SFemKcQ0WBuISBVkpuiaUB2qblC8UWlHEjdWVoZ8AdhSwmoEgsiXKfopX0CQxaACQ==}
-    engines: {node: '>=22'}
-
   bindings@1.5.0:
     resolution: {integrity: sha512-p2q/t/mhvuOj/UeLlV6566GD/guowlr0hHxClI0W9m7MWYkL1F0hLo+0Aexs9HSPCtR1SXQ0TD3MMKrXZajbiQ==}
 
@@ -1516,10 +1508,6 @@ packages:
   node-abi@3.96.0:
     resolution: {integrity: sha512-rebQ/lz7i0EkoLzUVSrKRzA69zMkwLp95kKMWoMDkkM00Suxz0D7zEQPwRml5fQum24mj7bPvmlgLAmu2JCiYg==}
     engines: {node: '>=10'}
-
-  node-addon-api@8.9.2:
-    resolution: {integrity: sha512-VijLXbi3UACN69I0JVXJsX4tjACjNoQDgv2gTF6sx2wWEi8tkSg2eX8p5gSIFi8z2+DL3oHmY6OyKce38SDolg==}
-    engines: {node: ^18 || ^20 || >= 21}
 
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
@@ -2311,12 +2299,6 @@ snapshots:
       human-id: 4.2.1
       prettier: 2.8.8
 
-  '@dugstack/drizzle-migrator@0.1.0(drizzle-orm@0.45.2(@types/better-sqlite3@9.6.0)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(pg@8.23.0))(pg@8.23.0)':
-    dependencies:
-      drizzle-orm: 0.45.2(@types/better-sqlite3@9.6.0)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(pg@8.23.0)
-    optionalDependencies:
-      pg: 8.23.0
-
   '@esbuild/aix-ppc64@0.27.7':
     optional: true
 
@@ -2869,11 +2851,6 @@ snapshots:
       bindings: 1.5.0
       prebuild-install: 7.1.3
 
-  better-sqlite3@13.0.3:
-    dependencies:
-      node-addon-api: 8.9.2
-    optional: true
-
   bindings@1.5.0:
     dependencies:
       file-uri-to-path: 1.0.0
@@ -3031,13 +3008,6 @@ snapshots:
       '@types/better-sqlite3': 9.6.0
       '@types/pg': 8.23.1
       better-sqlite3: 11.10.0
-      pg: 8.23.0
-
-  drizzle-orm@0.45.2(@types/better-sqlite3@9.6.0)(@types/pg@8.23.1)(better-sqlite3@13.0.3)(pg@8.23.0):
-    optionalDependencies:
-      '@types/better-sqlite3': 9.6.0
-      '@types/pg': 8.23.1
-      better-sqlite3: 13.0.3
       pg: 8.23.0
 
   eastasianwidth@0.2.0: {}
@@ -3369,9 +3339,6 @@ snapshots:
   node-abi@3.96.0:
     dependencies:
       semver: 7.8.5
-
-  node-addon-api@8.9.2:
-    optional: true
 
   normalize-path@3.0.0: {}
 
