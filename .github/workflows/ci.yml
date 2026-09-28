@@ -12,6 +12,7 @@ on:
       - "packages/core/**"
       - "packages/cli/**"
       - ".github/workflows/ci.yml"
+  workflow_dispatch:
 
 jobs:
   lib:
