@@ -39,9 +39,9 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
+    "better-sqlite3": ">=9.0.0",
     "drizzle-orm": "0.45.2",
-    "pg": ">=8.0.0",
-    "better-sqlite3": ">=9.0.0"
+    "pg": ">=8.0.0"
   },
   "peerDependenciesMeta": {
     "pg": {
@@ -56,7 +56,7 @@
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22",
     "@types/pg": "^8",
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "^11.10.0",
     "drizzle-orm": "0.45.2",
     "pg": "^8",
     "tsup": "^8",
