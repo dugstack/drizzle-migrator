@@ -22,10 +22,7 @@
   "bin": {
     "drizzle-migrator": "dist/bin.js"
   },
-  "files": [
-    "dist",
-    "skills"
-  ],
+  "files": ["dist", "skills"],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
