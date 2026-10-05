@@ -1,6 +1,6 @@
 {
   "name": "@dugstack/drizzle-migrator",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -30,17 +30,20 @@
       "import": "./dist/sqlite/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "test:integration": "vitest run test/pg.integration.test.ts test/sqlite.integration.test.ts",
+    "test:integration": "vitest run test/pg.integration.test.ts test/mysql.integration.test.ts test/sqlite.integration.test.ts",
     "lint": "biome check .",
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
     "better-sqlite3": ">=9.0.0",
     "drizzle-orm": "0.45.2",
+    "mysql2": ">=3.0.0",
     "pg": ">=8.0.0"
   },
   "peerDependenciesMeta": {
@@ -49,15 +52,20 @@
     },
     "better-sqlite3": {
       "optional": true
+    },
+    "mysql2": {
+      "optional": true
     }
   },
   "devDependencies": {
+    "@testcontainers/mysql": "^10.28.0",
     "@testcontainers/postgresql": "^10",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22",
     "@types/pg": "^8",
     "better-sqlite3": "^11.10.0",
     "drizzle-orm": "0.45.2",
+    "mysql2": "^3.24.5",
     "pg": "^8",
     "tsup": "^8",
     "typescript": "^5.7",

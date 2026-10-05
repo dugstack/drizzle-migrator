@@ -54,9 +54,10 @@ Two ways to consume the migrator:
   npm i @dugstack/drizzle-migrator drizzle-orm pg
   ```
 
-  The core package has zero runtime dependencies; `drizzle-orm` and `pg` are peer dependencies.
-  (The CLI package depends on `drizzle-orm`, `pg`, and `jiti` directly because it owns the
-  connection wiring and loads TypeScript config files.)
+  The core package has zero runtime dependencies; `drizzle-orm` is a peer dependency, plus the
+  optional driver peers for the dialects you use: `pg`, `mysql2`, `better-sqlite3`. (The CLI
+  package depends on `drizzle-orm`, `pg`, and `jiti` directly because it owns the connection
+  wiring and loads TypeScript config files.)
 
 ## Quick start — CLI executable
 
@@ -316,7 +317,8 @@ LIMIT 20;
   `MigrationEntrySuggestion`, `MigrationEntriesValidationResult`, `ValidationAuditOptions`,
   `MigratorLogger`, and `AuditLogEntry` types.
 - `@dugstack/drizzle-migrator/pg` — `pgDialect`, `PgDialect`.
-- `@dugstack/drizzle-migrator/mysql` — `mysqlDialect`, `MysqlDialect`.
+- `@dugstack/drizzle-migrator/mysql` — `mysqlDialect`, `MysqlDialect`, plus `createMysqlAdapter`,
+  `MysqlDatabase`, `MysqlTransaction`.
 - `@dugstack/drizzle-migrator/sqlite` — `sqliteDialect`, `SqliteDialect`, plus `createSqliteAdapter`,
   `SqliteDatabase`, `SqliteTransaction`.
 
@@ -329,6 +331,19 @@ is the value `--confirm-database` must match. SQLite has no advisory locks: `acq
 cross-process lock), and `releaseLock` commits it — publishing the entire run (tracking rows
 included) atomically; if the process dies first, journal rollback leaves nothing applied and
 nothing recorded. `runInTransaction` nests via SAVEPOINTs to work inside the held lock.
+
+MySQL notes: the adapter is built on `drizzle-orm/mysql2` (optional peer dependency `mysql2`,
+MySQL 8.0+), so pass it a `drizzle(client)` instance. Like SQLite, `config.schema` only
+participates in identifier validation — MySQL has no schemas, so tracking tables live in the
+database the connection selects. `currentDatabaseName` returns `DATABASE()` (null when connected
+without a default database), the value `--confirm-database` must match. Locking uses named
+advisory locks: `acquireLock` polls `GET_LOCK(name, 0)` until the session owns the lock and
+`releaseLock` fails loudly unless `RELEASE_LOCK` reports a release — both are session-scoped, so
+every method that takes a `db` must receive a **single dedicated `mysql2` Connection**, never a
+shared `Pool` (a Pool would run `GET_LOCK`, the migration statements, and `RELEASE_LOCK` on
+different connections). MySQL DDL implicitly commits: a migration whose `up()` runs DDL is not
+atomic — executed statements persist even when a later statement fails or the process dies, and
+the engine's `run.started` / `run.applied` audit rows are the reconstruction trail.
 
 Dialect tokens carry database types into `createMigrator`; passing a mismatched database handle to
 a bound migrator fails typechecking. Schema and tracking-table identifiers are validated through

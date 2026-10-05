@@ -67,15 +67,21 @@ describe("createMigrator", () => {
     });
   });
 
-  it("keeps mysql imports safe and throws from every adapter method", () => {
-    for (const [name, member] of Object.entries(mysqlDialect)) {
-      if (name === "id") {
-        continue;
-      }
-      expect(() => (member as () => unknown)(), name).toThrow(
-        "mysql adapter is not implemented in v1",
-      );
-    }
+  it("keeps mysql imports safe and validates identifiers with backticks", async () => {
+    const fixture = await createFixture();
+    expect(mysqlDialect.id).toBe("mysql");
+    expect(mysqlDialect.quoteIdentifier("ok_name1")).toBe("`ok_name1`");
+    expect(() => mysqlDialect.quoteIdentifier("bad`name")).toThrow(/invalid identifier/);
+    expect(() => mysqlDialect.quoteIdentifier("UPPER")).toThrow(/invalid identifier/);
+    expect(() => mysqlDialect.quoteIdentifier("1leading")).toThrow(/invalid identifier/);
+    expect(() => mysqlDialect.quoteIdentifier("semi;colon")).toThrow(/invalid identifier/);
+
+    const migrator = createMigrator({
+      dialect: mysqlDialect,
+      config: fixture.config,
+      migrations: [],
+    });
+    await expect(migrator.validateMigrationEntries()).resolves.toEqual({ ok: true, errors: [] });
   });
 
   it("delegates identifier validation to its dialect", async () => {
