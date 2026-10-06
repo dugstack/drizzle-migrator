@@ -1,4 +1,4 @@
-# RELEASE PIPELINE — stages alpha releases through changesets and npm OIDC.
+# RELEASE PIPELINE — stages releases under the latest tag through changesets and npm OIDC.
 # GitHub supplies a short-lived identity token; npm verifies it against each
 # package's Trusted Publisher configuration. A maintainer approves each stage.
 

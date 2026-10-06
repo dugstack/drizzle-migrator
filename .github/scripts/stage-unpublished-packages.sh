@@ -15,6 +15,6 @@ for package_dir in packages/core packages/cli; do
 
   (
     cd "$package_dir"
-    npm stage publish --access public --provenance --tag alpha
+    npm stage publish --access public --provenance --tag latest
   )
 done
