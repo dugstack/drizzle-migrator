@@ -1,5 +1,16 @@
 # @dugstack/drizzle-migrator-cli
 
+## 0.2.1
+
+### Patch Changes
+
+- Externalize the optional mysql and sqlite drivers in the published bundle. tsup auto-externalizes
+  dependencies and peerDependencies but bundles optionalDependencies, so the 0.2.0 tarball inlined
+  better-sqlite3 (CJS) into the ESM output and every mysql/sqlite command failed at first use with
+  "Dynamic require of \"fs\" is not supported" — even with the driver installed. The drivers now
+  stay runtime-resolved imports exactly like the lazy-loading design intends; verified against the
+  built dist for both dialects.
+
 ## 0.2.0
 
 ### Minor Changes

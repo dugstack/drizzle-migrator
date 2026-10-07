@@ -7,6 +7,11 @@ const shared: Options = {
   platform: "node",
   splitting: false,
   clean: false,
+  // tsup auto-externalizes dependencies and peerDependencies but bundles
+  // optionalDependencies; the mysql and sqlite drivers are optional and must
+  // stay runtime-resolved imports — bundling a CJS driver into the ESM output
+  // breaks it with "Dynamic require of \"fs\" is not supported" at first use.
+  external: ["better-sqlite3", "mysql2", "mysql2/promise"],
 };
 
 export default defineConfig([
