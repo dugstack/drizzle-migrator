@@ -1,8 +1,8 @@
 # `@dugstack/drizzle-migrator-cli`
 
 The executable `drizzle-migrator` command for [`@dugstack/drizzle-migrator`](../core). One
-config file, no registry files, no bin script — the CLI discovers everything, owns the Postgres
-connection wiring, and owns the entire command surface: dispatch, flag parsing, prompts, usage
+config file, no registry files, no bin script — the CLI discovers everything, owns the database
+connection wiring (postgres, mysql, and sqlite), and owns the entire command surface: dispatch, flag parsing, prompts, usage
 text, output rendering, and exit codes. The core package is a pure programmatic service.
 
 ```sh
@@ -52,6 +52,30 @@ export default {
 };
 ```
 
+The `dialect` field picks the connection block: `"postgres"` pairs with `postgres`, `"mysql"`
+with `mysql`, and `"sqlite"` with `sqlite`:
+
+```ts
+// mysql
+export default {
+  dialect: "mysql",
+  mysql: { connectionString: process.env.DATABASE_URL! }, // mysql:// or mariadb:// URL
+  migratorOutDir: "./src/db/migrator",
+};
+
+// sqlite
+export default {
+  dialect: "sqlite",
+  sqlite: { path: "./data/app.db" }, // database file; parent dirs are your job
+  migratorOutDir: "./src/db/migrator",
+};
+```
+
+The mysql and sqlite drivers ship as optional dependencies of the CLI and load lazily — a
+postgres-only install never touches them; an omitted optional dependency fails with an install
+hint. mysql sessions must be a single connection (the advisory lock is session-scoped), which is
+exactly what the CLI wires.
+
 2. **Generate SQL with drizzle-kit** as usual (`drizzle-kit generate` writes `*.sql` files to the
    SQL directory).
 
@@ -72,8 +96,14 @@ pnpm exec drizzle-migrator migrate
 
 | field | required | notes |
 | --- | --- | --- |
-| `dialect` | ✓ | `"postgres"` only in v1; pairs with the optional `postgres` block |
-| `postgres.connectionString` | – | `postgres://` URL or key=value connection string. Optional: `generate` and `validate` run without it; `migrate`, `adopt`, and `status` require it and fail before any connection attempt when it is absent |
+| `dialect` | ✓ | `"postgres"`, `"mysql"`, or `"sqlite"`; selects the matching connection block |
+| `postgres.connectionString` | – | `postgres://` URL or key=value connection string |
+| `mysql.connectionString` | – | `mysql://` or `mariadb://` URL |
+| `sqlite.path` | – | path to the database file (`:memory:` keeps it in process) |
+
+Connection blocks are optional for every dialect: `generate` and `validate` run without one;
+`migrate`, `adopt`, and `status` require it and fail before any connection attempt when it is
+absent. A block belonging to a different dialect than `dialect` is a config error.
 | `migratorOutDir` | ✓ | folder scanned for `v<semver>/index.ts` migration entries |
 | `drizzleOutDir` | – | drizzle-kit SQL output folder; see resolution below |
 | `lockName` | – | advisory-lock name; default `"drizzle-migrator"`. Never change after first deploy |
@@ -150,7 +180,7 @@ a `finally` block.
 
 Connection rules:
 
-- **No `postgres.connectionString`?** `generate` and `validate` run entirely connection-free; the
+- **No connection configured for the dialect?** `generate` and `validate` run entirely connection-free; the
   database commands (`migrate`, `adopt`, `status`) fail before any connection attempt.
 - **`validate` with a configured connection string** opens one dedicated connection, passes it to
   the core's `validateMigrationEntries` (recording the `validation.started` +
@@ -164,16 +194,17 @@ Connection rules:
 
 For each command the CLI: parses and validates the command + flags against the command table
 (before touching the filesystem), loads + validates the config, resolves the SQL directory,
-discovers migrations, then — for database commands — opens **one dedicated `pg.Client`**, wraps
-it with `drizzle(client)`, and binds `pgDialect` + config + migrations through `createMigrator(...)`
+discovers migrations, then — for database commands — opens **one dedicated session-scoped connection** for the configured dialect (`pg.Client`, a
+mysql2 `Connection`, or a better-sqlite3 `Database`), wraps
+it with drizzle, and binds the dialect token + config + migrations through `createMigrator(...)`
 before dispatching. The advisory lock is session-scoped, so acquire/migrate/release always share
 that single connection — the CLI owns this wiring; the core stays a pure programmatic service.
 
 ## When to use the core package directly
 
 The CLI covers the standard project shape. Reach for the programmatic API
-([`@dugstack/drizzle-migrator`](../core)) when you need your own bin script, a
-non-postgres dialect token, or embedded migration runs — `createMigrator({ dialect, config,
+([`@dugstack/drizzle-migrator`](../core)) when you need your own bin script, or embedded
+migration runs — `createMigrator({ dialect, config,
 migrations })` plus the `Migrator` service methods (`runMigrations`, `adoptMigrations`,
 `getStatus`, `validateMigrationEntries`, `suggestMigrationEntry`, `generateMigrationEntry`,
 `appendAuditEvent`) are the entire surface; the core never parses argv, prints output, or sets

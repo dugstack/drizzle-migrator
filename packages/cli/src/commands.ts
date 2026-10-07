@@ -16,7 +16,7 @@ export type CliFlagSpec = {
 export type CliCommandSpec = {
   name: string;
   description: string;
-  /** True when the command cannot run without `postgres.connectionString`. */
+  /** True when the command cannot run without the configured connection block. */
   requiresDatabase: boolean;
   flags: readonly CliFlagSpec[];
 };

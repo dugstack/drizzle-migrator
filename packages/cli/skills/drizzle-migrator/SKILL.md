@@ -8,7 +8,7 @@ description: Operating manual for @dugstack/drizzle-migrator-cli — how AI agen
 The `drizzle-migrator` executable (npm `@dugstack/drizzle-migrator-cli`) for the
 `@dugstack/drizzle-migrator` core. The app owns a `drizzle-migrator.config.ts`, version folders,
 and SQL files produced by `drizzle-kit generate`; the CLI discovers all of them and owns every
-command, prompt, and the Postgres connection, while the core engine keeps the guarantees this
+command, prompt, and the database connection, while the core engine keeps the guarantees this
 manual explains: forward-only history, atomic per-migration transactions, a surviving audit
 trail, and compile-time-restricted SQL files.
 

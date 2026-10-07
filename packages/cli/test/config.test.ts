@@ -1,7 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LOCK_NAME, defineConfig, resolveCliConfig } from "../src/index.js";
+import {
+  type CliDialect,
+  DEFAULT_LOCK_NAME,
+  type MigratorCliConfig,
+  defineConfig,
+  resolveCliConfig,
+} from "../src/index.js";
 
 const GOOD_URL = "postgres://user:pass@localhost:5432/app";
+const GOOD_MYSQL_URL = "mysql://user:pass@localhost:3306/app";
+
+/** Narrows the resolved union so dialect-specific fields are readable in tests. */
+function expectDialect<D extends CliDialect>(
+  config: MigratorCliConfig,
+  dialect: D,
+): Extract<MigratorCliConfig, { dialect: D }> {
+  if (config.dialect !== dialect) {
+    throw new Error(`expected dialect "${dialect}", got "${config.dialect}"`);
+  }
+  return config as Extract<MigratorCliConfig, { dialect: D }>;
+}
 
 describe("cli defineConfig", () => {
   it("applies the CLI defaults", () => {
@@ -34,6 +52,28 @@ describe("cli defineConfig", () => {
     expect(config.schema).toBe("private_migrations");
   });
 
+  it("resolves a mysql connection block", () => {
+    const config = defineConfig({
+      dialect: "mysql",
+      mysql: { connectionString: GOOD_MYSQL_URL },
+      migratorOutDir: "./db/migrator",
+    });
+    expect(config.dialect).toBe("mysql");
+    expect(config.mysql).toEqual({ connectionString: GOOD_MYSQL_URL });
+    expect(config.lockName).toBe(DEFAULT_LOCK_NAME);
+  });
+
+  it("resolves a sqlite connection block", () => {
+    const config = defineConfig({
+      dialect: "sqlite",
+      sqlite: { path: "./data/app.db" },
+      migratorOutDir: "./db/migrator",
+    });
+    expect(config.dialect).toBe("sqlite");
+    expect(config.sqlite).toEqual({ path: "./data/app.db" });
+    expect(config.lockName).toBe(DEFAULT_LOCK_NAME);
+  });
+
   it("rejects mistyped config shapes at compile time", () => {
     const numericConnectionString = {
       dialect: "postgres",
@@ -43,17 +83,25 @@ describe("cli defineConfig", () => {
     // @ts-expect-error postgres.connectionString must be a string
     expect(() => defineConfig(numericConnectionString)).toThrow(/must be a string when present/);
 
-    const wrongDialect = { dialect: "mysql", migratorOutDir: "./m" };
-    // @ts-expect-error only "postgres" exists in the union in v1
-    expect(() => defineConfig(wrongDialect)).toThrow(/"dialect" must be "postgres"/);
+    const wrongDialect = { dialect: "mongodb", migratorOutDir: "./m" };
+    // @ts-expect-error "mongodb" is not in the dialect union
+    expect(() => defineConfig(wrongDialect)).toThrow(
+      /"dialect" must be one of "postgres", "mysql", "sqlite"/,
+    );
   });
 
-  it("resolves a missing postgres block to undefined (connection-free commands still run)", () => {
-    const config = resolveCliConfig({
-      dialect: "postgres",
-      migratorOutDir: "./m",
-    });
-    expect(config.postgres).toBeUndefined();
+  it("resolves a missing connection block to undefined (connection-free commands still run)", () => {
+    expect(
+      expectDialect(resolveCliConfig({ dialect: "postgres", migratorOutDir: "./m" }), "postgres")
+        .postgres,
+    ).toBeUndefined();
+    expect(
+      expectDialect(resolveCliConfig({ dialect: "mysql", migratorOutDir: "./m" }), "mysql").mysql,
+    ).toBeUndefined();
+    expect(
+      expectDialect(resolveCliConfig({ dialect: "sqlite", migratorOutDir: "./m" }), "sqlite")
+        .sqlite,
+    ).toBeUndefined();
   });
 
   it("resolves an empty connection string to undefined instead of erroring", () => {
@@ -64,14 +112,28 @@ describe("cli defineConfig", () => {
       postgres: { connectionString: process.env.NEVER_SET_VAR as string },
       migratorOutDir: "./m",
     });
-    expect(unset.postgres).toBeUndefined();
+    expect(expectDialect(unset, "postgres").postgres).toBeUndefined();
 
     const empty = resolveCliConfig({
       dialect: "postgres",
       postgres: { connectionString: "   " },
       migratorOutDir: "./m",
     });
-    expect(empty.postgres).toBeUndefined();
+    expect(expectDialect(empty, "postgres").postgres).toBeUndefined();
+
+    const emptyMysql = resolveCliConfig({
+      dialect: "mysql",
+      mysql: { connectionString: "   " },
+      migratorOutDir: "./m",
+    });
+    expect(expectDialect(emptyMysql, "mysql").mysql).toBeUndefined();
+
+    const emptySqlite = resolveCliConfig({
+      dialect: "sqlite",
+      sqlite: { path: "   " },
+      migratorOutDir: "./m",
+    });
+    expect(expectDialect(emptySqlite, "sqlite").sqlite).toBeUndefined();
   });
 
   it("accepts a keyword (key=value) connection string", () => {
@@ -80,7 +142,22 @@ describe("cli defineConfig", () => {
       postgres: { connectionString: "host=localhost dbname=app" },
       migratorOutDir: "./m",
     });
+    if (config.dialect !== "postgres") {
+      throw new Error("expected the postgres member");
+    }
     expect(config.postgres?.connectionString).toBe("host=localhost dbname=app");
+  });
+
+  it("accepts the mariadb URL scheme for the mysql dialect", () => {
+    const config = resolveCliConfig({
+      dialect: "mysql",
+      mysql: { connectionString: "mariadb://user:pass@localhost/app" },
+      migratorOutDir: "./m",
+    });
+    if (config.dialect !== "mysql") {
+      throw new Error("expected the mysql member");
+    }
+    expect(config.mysql?.connectionString).toBe("mariadb://user:pass@localhost/app");
   });
 });
 
@@ -94,6 +171,12 @@ describe("cli config validation (runtime, on loaded exports)", () => {
     expect(() =>
       resolveCliConfig({ dialect: "postgres", postgres: "nope", migratorOutDir: "./m" }),
     ).toThrow(/"postgres" must be an object/);
+  });
+
+  it("rejects a non-object sqlite block", () => {
+    expect(() =>
+      resolveCliConfig({ dialect: "sqlite", sqlite: 123, migratorOutDir: "./m" }),
+    ).toThrow(/"sqlite" must be an object/);
   });
 
   it("rejects a non-string connection string", () => {
@@ -123,6 +206,16 @@ describe("cli config validation (runtime, on loaded exports)", () => {
     ).not.toThrow();
   });
 
+  it("rejects a non-mysql URL scheme", () => {
+    expect(() =>
+      resolveCliConfig({
+        dialect: "mysql",
+        mysql: { connectionString: "postgres://user:pass@localhost/app" },
+        migratorOutDir: "./m",
+      }),
+    ).toThrow(/scheme "postgres" is not mysql/);
+  });
+
   it("rejects a connection string that is neither a URL nor key=value", () => {
     expect(() =>
       resolveCliConfig({
@@ -131,6 +224,33 @@ describe("cli config validation (runtime, on loaded exports)", () => {
         migratorOutDir: "./m",
       }),
     ).toThrow(/key=value connection string/);
+  });
+
+  it("rejects URLs in the sqlite path", () => {
+    expect(() =>
+      resolveCliConfig({
+        dialect: "sqlite",
+        sqlite: { path: "file:///tmp/app.db" },
+        migratorOutDir: "./m",
+      }),
+    ).toThrow(/"sqlite.path" must be an absolute filesystem path/);
+  });
+
+  it("rejects a connection block that does not match the dialect", () => {
+    expect(() =>
+      resolveCliConfig({
+        dialect: "postgres",
+        mysql: { connectionString: GOOD_MYSQL_URL },
+        migratorOutDir: "./m",
+      }),
+    ).toThrow(/"mysql" connection block requires "dialect": "mysql"/);
+    expect(() =>
+      resolveCliConfig({
+        dialect: "mysql",
+        sqlite: { path: "./app.db" },
+        migratorOutDir: "./m",
+      }),
+    ).toThrow(/"sqlite" connection block requires "dialect": "sqlite"/);
   });
 
   it("requires migratorOutDir", () => {
@@ -151,8 +271,8 @@ describe("cli config validation (runtime, on loaded exports)", () => {
   });
 
   it("rejects an unknown dialect with the supported list", () => {
-    expect(() => resolveCliConfig({ dialect: "sqlite", migratorOutDir: "./m" })).toThrow(
-      /"dialect" must be "postgres"/,
+    expect(() => resolveCliConfig({ dialect: "mongodb", migratorOutDir: "./m" })).toThrow(
+      /"dialect" must be one of "postgres", "mysql", "sqlite"/,
     );
   });
 });

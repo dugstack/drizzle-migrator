@@ -1,5 +1,20 @@
 # @dugstack/drizzle-migrator-cli
 
+## 0.2.0
+
+### Minor Changes
+
+- Support the mysql and sqlite dialects in the CLI. `drizzle-migrator.config.ts` now accepts
+  `dialect: "mysql"` (with an optional `mysql.connectionString`, a `mysql://` or `mariadb://` URL)
+  and `dialect: "sqlite"` (with an optional `sqlite.path` database file path) alongside the
+  existing postgres block; a block that does not match `dialect` is a config error. The mysql and
+  sqlite drivers ship as optional dependencies and load lazily — a postgres-only install never
+  touches them, and an omitted optional dependency fails with an install hint. Every database
+  command still runs on one dedicated session-scoped connection per invocation, which the
+  session-scoped advisory locks of both server dialects require. mysql and sqlite end-to-end CLI
+  suites cover migrate, status, generate, the validate audit trail, and the no-connection
+  refusals.
+
 ## 0.1.4
 
 ### Patch Changes

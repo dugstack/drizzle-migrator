@@ -11,24 +11,23 @@ export type MigratorLockConfig = MigratorConfig["lock"];
 /** Mirrors the plan: `lockName` defaults to "drizzle-migrator" in the CLI config. */
 export const DEFAULT_LOCK_NAME = "drizzle-migrator";
 
+export type CliDialect = "postgres" | "mysql" | "sqlite";
+
 export type PostgresCliConnection = {
   connectionString: string;
 };
 
-/**
- * Discriminated by `dialect`. v1 ships the postgres member only; future dialects
- * join as additional union members behind their own connection block.
- */
-export type MigratorCliConfigInput = PostgresCliConfigInput;
+export type MysqlCliConnection = {
+  connectionString: string;
+};
 
-export type PostgresCliConfigInput = {
-  dialect: "postgres";
-  /**
-   * Optional since Revision 3: connection-free commands (`generate`, `validate`)
-   * run without it; commands that need a database (`migrate`, `adopt`, `status`)
-   * fail before execution when it is absent.
-   */
-  postgres?: PostgresCliConnection;
+export type SqliteCliConnection = {
+  /** Path to the database file; ":memory:" keeps everything in process. */
+  path: string;
+};
+
+/** Fields shared by every dialect member of the CLI config. */
+type CliConfigBase = {
   /** Folder holding the migration entries; auto-discovery scans its v<semver>/index.ts folders. */
   migratorOutDir: string;
   /** drizzle-kit SQL output folder. Wins over the `out` field of drizzle.config.*. */
@@ -42,10 +41,33 @@ export type PostgresCliConfigInput = {
   logger?: MigratorLogger;
 };
 
-export type MigratorCliConfig = {
+/**
+ * Discriminated by `dialect`; each dialect carries its own optional connection
+ * block. Connection-free commands (`generate`, `validate`) run without it;
+ * commands that need a database (`migrate`, `adopt`, `status`) fail before
+ * execution when it is absent.
+ */
+export type PostgresCliConfigInput = CliConfigBase & {
   dialect: "postgres";
-  /** undefined when no usable connection string is configured (see resolveCliConfig). */
-  postgres: PostgresCliConnection | undefined;
+  postgres?: PostgresCliConnection;
+};
+
+export type MysqlCliConfigInput = CliConfigBase & {
+  dialect: "mysql";
+  mysql?: MysqlCliConnection;
+};
+
+export type SqliteCliConfigInput = CliConfigBase & {
+  dialect: "sqlite";
+  sqlite?: SqliteCliConnection;
+};
+
+export type MigratorCliConfigInput =
+  | PostgresCliConfigInput
+  | MysqlCliConfigInput
+  | SqliteCliConfigInput;
+
+type CliConfigResolvedBase = {
   migratorOutDir: string;
   drizzleOutDir: string | undefined;
   lockName: string;
@@ -55,8 +77,15 @@ export type MigratorCliConfig = {
   logger: MigratorLogger;
 };
 
+export type MigratorCliConfig =
+  | ({ dialect: "postgres"; postgres: PostgresCliConnection | undefined } & CliConfigResolvedBase)
+  | ({ dialect: "mysql"; mysql: MysqlCliConnection | undefined } & CliConfigResolvedBase)
+  | ({ dialect: "sqlite"; sqlite: SqliteCliConnection | undefined } & CliConfigResolvedBase);
+
 const PATH_URL_PATTERN = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
 const CONNECTION_STRING_SCHEME_PATTERN = /^([a-zA-Z][a-zA-Z0-9+.-]*):\/\//;
+const POSTGRES_SCHEMES = new Set(["postgres", "postgresql"]);
+const MYSQL_SCHEMES = new Set(["mysql", "mariadb"]);
 
 function checkPath(field: string, value: unknown, errors: string[]): void {
   if (value === undefined) {
@@ -82,30 +111,64 @@ function checkPath(field: string, value: unknown, errors: string[]): void {
  * database fail at run time with their own message. Returns true when a usable
  * string was validated.
  */
-function checkConnectionString(value: unknown, errors: string[]): boolean {
+function checkConnectionString(
+  field: string,
+  value: unknown,
+  schemes: ReadonlySet<string>,
+  expected: string,
+  fallbackHint: string | undefined,
+  errors: string[],
+): boolean {
   if (value === undefined || (typeof value === "string" && value.trim().length === 0)) {
     return false;
   }
   if (typeof value !== "string") {
-    errors.push(`"postgres.connectionString" must be a string when present`);
+    errors.push(`"${field}" must be a string when present`);
     return true;
   }
   const scheme = CONNECTION_STRING_SCHEME_PATTERN.exec(value)?.[1];
   if (scheme !== undefined) {
     const normalized = scheme.toLowerCase();
-    if (normalized !== "postgres" && normalized !== "postgresql") {
-      errors.push(
-        `"postgres.connectionString" URL scheme "${scheme}" is not postgres (expected postgres:// or postgresql://)`,
-      );
+    if (!schemes.has(normalized)) {
+      errors.push(`"${field}" URL scheme "${scheme}" is not ${expected} (expected ${expected}://)`);
     }
     return true;
   }
-  if (!value.includes("=")) {
+  if (fallbackHint !== undefined && !value.includes("=")) {
     errors.push(
-      `"postgres.connectionString" must be a postgres:// URL or a key=value connection string (e.g. "host=localhost dbname=app")`,
+      `"${field}" must be a ${expected}:// URL or a key=value connection string (e.g. "${fallbackHint}")`,
     );
   }
   return true;
+}
+
+function readConnectionBlock(
+  raw: Record<string, unknown>,
+  dialect: CliDialect,
+  errors: string[],
+): Record<string, unknown> | undefined {
+  // A block for a different dialect is almost certainly a config typo; check
+  // it before the dialect's own (possibly absent) block short-circuits.
+  for (const other of ["postgres", "mysql", "sqlite"] as const) {
+    if (other !== dialect && raw[other] !== undefined) {
+      errors.push(
+        `"${other}" connection block requires "dialect": "${other}" (the config declares "${dialect}")`,
+      );
+    }
+  }
+  const block = raw[dialect];
+  if (block === undefined || block === null) {
+    return undefined;
+  }
+  if (typeof block !== "object") {
+    errors.push(
+      `"${dialect}" must be an object${
+        dialect === "sqlite" ? ' with a "path"' : ' with a "connectionString"'
+      } when present`,
+    );
+    return undefined;
+  }
+  return block as Record<string, unknown>;
 }
 
 /**
@@ -123,26 +186,64 @@ export function resolveCliConfig(input: unknown): MigratorCliConfig {
   }
   const raw = input as Record<string, unknown>;
 
-  if (raw.dialect !== "postgres") {
+  const dialect = raw.dialect;
+  if (dialect !== "postgres" && dialect !== "mysql" && dialect !== "sqlite") {
     errors.push(
-      `"dialect" must be "postgres" (got ${JSON.stringify(raw.dialect) ?? "undefined"}); other dialects are not implemented yet`,
+      `"dialect" must be one of "postgres", "mysql", "sqlite" (got ${JSON.stringify(dialect) ?? "undefined"})`,
+    );
+    throw new Error(
+      `invalid migrator CLI config:\n${errors.map((error) => `- ${error}`).join("\n")}`,
     );
   }
 
-  // The postgres block is optional: absent, empty, or env-var-driven undefined
-  // connection strings resolve to `postgres: undefined` so connection-free
-  // commands (generate, validate) keep working; database commands then fail at
-  // run time with a "requires a database" message instead of a config error.
+  const connectionBlock = readConnectionBlock(raw, dialect, errors);
+
   let postgres: PostgresCliConnection | undefined;
-  if (raw.postgres !== undefined && raw.postgres !== null) {
-    if (typeof raw.postgres !== "object") {
-      errors.push(`"postgres" must be an object with a "connectionString" when present`);
+  let mysql: MysqlCliConnection | undefined;
+  let sqlite: SqliteCliConnection | undefined;
+
+  if (dialect === "postgres" && connectionBlock !== undefined) {
+    if (
+      checkConnectionString(
+        "postgres.connectionString",
+        connectionBlock.connectionString,
+        POSTGRES_SCHEMES,
+        "postgres",
+        "host=localhost dbname=app",
+        errors,
+      ) &&
+      typeof connectionBlock.connectionString === "string"
+    ) {
+      postgres = { connectionString: connectionBlock.connectionString };
+    }
+  }
+
+  if (dialect === "mysql" && connectionBlock !== undefined) {
+    if (
+      checkConnectionString(
+        "mysql.connectionString",
+        connectionBlock.connectionString,
+        MYSQL_SCHEMES,
+        "mysql",
+        undefined,
+        errors,
+      ) &&
+      typeof connectionBlock.connectionString === "string"
+    ) {
+      mysql = { connectionString: connectionBlock.connectionString };
+    }
+  }
+
+  if (dialect === "sqlite" && connectionBlock !== undefined) {
+    const path = connectionBlock.path;
+    if (path === undefined || (typeof path === "string" && path.trim().length === 0)) {
+      // Absent path behaves like the URL-based dialects: an empty block resolves
+      // to no connection so connection-free commands keep working.
+    } else if (typeof path === "string") {
+      checkPath("sqlite.path", path, errors);
+      sqlite = { path };
     } else {
-      const connection = raw.postgres as Record<string, unknown>;
-      const hasConnectionString = checkConnectionString(connection.connectionString, errors);
-      if (hasConnectionString && typeof connection.connectionString === "string") {
-        postgres = { connectionString: connection.connectionString };
-      }
+      errors.push(`"sqlite.path" must be a string when present`);
     }
   }
 
@@ -164,9 +265,7 @@ export function resolveCliConfig(input: unknown): MigratorCliConfig {
   }
 
   // schema/tables/lock/logger pass through unchanged; defineCoreConfig validates them.
-  return {
-    dialect: "postgres",
-    postgres,
+  const resolvedBase: CliConfigResolvedBase = {
     migratorOutDir: raw.migratorOutDir as string,
     drizzleOutDir: raw.drizzleOutDir as string | undefined,
     lockName: (raw.lockName as string | undefined) ?? DEFAULT_LOCK_NAME,
@@ -175,11 +274,24 @@ export function resolveCliConfig(input: unknown): MigratorCliConfig {
     lock: raw.lock as Partial<MigratorLockConfig> | undefined,
     logger: (raw.logger as MigratorLogger | undefined) ?? console,
   };
+
+  if (dialect === "mysql") {
+    return { dialect, mysql, ...resolvedBase };
+  }
+  if (dialect === "sqlite") {
+    return { dialect, sqlite, ...resolvedBase };
+  }
+  return { dialect: "postgres", postgres, ...resolvedBase };
 }
 
+/** The resolved config member matching a given dialect literal. */
+type ResolvedFor<D extends CliDialect> = Extract<MigratorCliConfig, { dialect: D }>;
+
 /** Authoring-time sugar with full type checking; identical validation to the runner. */
-export function defineConfig(input: MigratorCliConfigInput): MigratorCliConfig {
-  return resolveCliConfig(input);
+export function defineConfig<T extends MigratorCliConfigInput>(
+  input: T,
+): ResolvedFor<T["dialect"]> {
+  return resolveCliConfig(input) as ResolvedFor<T["dialect"]>;
 }
 
 /** Builds the core MigratorConfig once the drizzle SQL directory is resolved. */

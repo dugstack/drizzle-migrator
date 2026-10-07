@@ -1,6 +1,7 @@
 import {
   type Migration,
   type MigrationEntriesValidationResult,
+  type Migrator,
   type MigratorConfig,
   type MigratorLogger,
   createMigrator,
@@ -14,23 +15,53 @@ import {
   validateCommandFlags,
 } from "./commands.js";
 import { type MigratorCliConfig, resolveCliConfig, toCoreConfig } from "./config.js";
-import { type PgConnection, connectPostgres } from "./connect.js";
+import {
+  type CliConnection,
+  connectDatabase,
+  connectionKey,
+  connectionSettingHint,
+} from "./connection.js";
 import { discoverMigrations, findMigratorConfigPath } from "./discovery.js";
 import { resolveSqlDir } from "./drizzle-out.js";
 import { createModuleLoader, unwrapDefaultExport } from "./loader.js";
 import { askWithDefault } from "./prompts.js";
 import { printUsage } from "./usage.js";
 
-/** The pg-bound migrator the executable builds per invocation. */
-function createPgMigrator(options: { config: MigratorConfig; migrations: Migration[] }) {
-  return createMigrator({
-    dialect: pgDialect,
-    config: options.config,
-    migrations: options.migrations,
-  });
+/**
+ * The dialect-bound migrator the executable builds per invocation. The db
+ * types are erased here: the CLI dispatches dynamically on the configured
+ * dialect and hands each core adapter its own concrete database handle. The
+ * mysql and sqlite dialect tokens load lazily — they runtime-import their
+ * drivers, and a postgres-only install must not need them.
+ */
+async function createDialectMigrator(options: {
+  cliConfig: MigratorCliConfig;
+  config: MigratorConfig;
+  migrations: Migration[];
+}): Promise<Migrator<unknown, unknown>> {
+  const { cliConfig, config, migrations } = options;
+  const dialect = cliConfig.dialect;
+  if (dialect === "mysql") {
+    const { mysqlDialect } = await import("@dugstack/drizzle-migrator/mysql");
+    return createMigrator({ dialect: mysqlDialect, config, migrations }) as unknown as Migrator<
+      unknown,
+      unknown
+    >;
+  }
+  if (dialect === "sqlite") {
+    const { sqliteDialect } = await import("@dugstack/drizzle-migrator/sqlite");
+    return createMigrator({ dialect: sqliteDialect, config, migrations }) as unknown as Migrator<
+      unknown,
+      unknown
+    >;
+  }
+  return createMigrator({ dialect: pgDialect, config, migrations }) as unknown as Migrator<
+    unknown,
+    unknown
+  >;
 }
 
-type CliMigrator = ReturnType<typeof createPgMigrator>;
+type CliMigrator = Awaited<ReturnType<typeof createDialectMigrator>>;
 
 export type GlobalFlags = {
   config: string | undefined;
@@ -134,7 +165,7 @@ async function emitCliCommandAudit(
   }
 }
 
-async function closeConnection(logger: MigratorLogger, connection: PgConnection): Promise<void> {
+async function closeConnection(logger: MigratorLogger, connection: CliConnection): Promise<void> {
   await connection.close().catch((error) => {
     logger.error("[drizzle-migrator] failed to close the connection:", error);
   });
@@ -189,8 +220,7 @@ async function runConnectionFreeCommand(context: CommandContext): Promise<void> 
   }
 
   // validate
-  const connectionString = cliConfig.postgres?.connectionString;
-  if (connectionString === undefined) {
+  if (connectionKey(cliConfig) === undefined) {
     // No connection requested: validation stays completely connection-free and
     // audit failures are impossible.
     try {
@@ -201,9 +231,9 @@ async function runConnectionFreeCommand(context: CommandContext): Promise<void> 
     }
     return;
   }
-  let connection: PgConnection;
+  let connection: CliConnection;
   try {
-    connection = await connectPostgres(connectionString);
+    connection = await connectDatabase(cliConfig);
   } catch (error) {
     // A requested connection that cannot be established is a CLI error.
     logger.error(errorMessage(error));
@@ -226,27 +256,27 @@ async function runConnectionFreeCommand(context: CommandContext): Promise<void> 
 
 /**
  * Database commands (requiresDatabase: true in the command table): migrate,
- * adopt, status. One dedicated pg connection per command (the advisory lock is
- * session-scoped), the redacted cli.command audit event, all failure rendering,
- * and the guaranteed close in the finally block are CLI-owned.
+ * adopt, status. One dedicated session-scoped connection per command (the
+ * advisory lock is session-scoped on every dialect), the redacted cli.command
+ * audit event, all failure rendering, and the guaranteed close in the finally
+ * block are CLI-owned.
  */
 async function runDatabaseCommand(context: CommandContext): Promise<void> {
   const { spec, flags, migrator, cliConfig, logger } = context;
   const command = spec.name;
 
-  const connectionString = cliConfig.postgres?.connectionString;
-  if (connectionString === undefined) {
+  if (connectionKey(cliConfig) === undefined) {
     // Fails before any connection attempt.
     logger.error(
-      `command "${command}" requires a database connection — set "postgres.connectionString" in the migrator config`,
+      `command "${command}" requires a database connection — set ${connectionSettingHint(cliConfig.dialect)} in the migrator config`,
     );
     process.exitCode = 1;
     return;
   }
 
-  let connection: PgConnection;
+  let connection: CliConnection;
   try {
-    connection = await connectPostgres(connectionString);
+    connection = await connectDatabase(cliConfig);
   } catch (error) {
     logger.error(errorMessage(error));
     process.exitCode = 1;
@@ -358,7 +388,7 @@ async function executeCommand(context: CommandContext): Promise<void> {
 /**
  * Runs the `drizzle-migrator` executable. The CLI owns everything argv-shaped (global
  * flags, command parsing, flag validation) plus output, exit codes, prompts,
- * and the Postgres connection lifecycle; the core package is a pure
+ * and the database connection lifecycle; the core package is a pure
  * programmatic service that receives only structured calls.
  */
 export async function runCli(argv: readonly string[] = process.argv.slice(2)): Promise<void> {
@@ -428,7 +458,7 @@ export async function runCli(argv: readonly string[] = process.argv.slice(2)): P
       logger,
     });
 
-    const migrator = createPgMigrator({ config, migrations });
+    const migrator = await createDialectMigrator({ cliConfig, config, migrations });
     await executeCommand({
       spec,
       flags,

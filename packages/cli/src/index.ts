@@ -1,12 +1,24 @@
-export { DEFAULT_LOCK_NAME, defineConfig, resolveCliConfig, toCoreConfig } from "./config.js";
+export {
+  DEFAULT_LOCK_NAME,
+  defineConfig,
+  resolveCliConfig,
+  toCoreConfig,
+} from "./config.js";
 export type {
+  CliDialect,
   MigratorCliConfig,
   MigratorCliConfigInput,
+  MysqlCliConfigInput,
+  MysqlCliConnection,
   PostgresCliConfigInput,
   PostgresCliConnection,
+  SqliteCliConfigInput,
+  SqliteCliConnection,
 } from "./config.js";
-export { connectPostgres } from "./connect.js";
-export type { PgConnection } from "./connect.js";
+export { connectMysql, connectPostgres, connectSqlite } from "./connect.js";
+export type { MysqlConnection, PgConnection, SqliteConnection } from "./connect.js";
+export { connectDatabase, connectionKey, connectionSettingHint } from "./connection.js";
+export type { CliConnection } from "./connection.js";
 export {
   CLI_COMMANDS,
   flagList,
