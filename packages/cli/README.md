@@ -14,8 +14,12 @@ pnpm exec drizzle-migrator --config ./db/migrator.config.ts status
 ## Install
 
 ```sh
-npm i -D @dugstack/drizzle-migrator-cli
+npm i -D @dugstack/drizzle-migrator-cli @dugstack/drizzle-migrator
 ```
+
+Migration entries import `@dugstack/drizzle-migrator` directly, so declare both packages in
+your app, including with pnpm's strict dependency resolution. Requires Node.js 20+; the
+current Drizzle ORM compatibility target is exactly 0.45.2.
 
 The CLI depends on `drizzle-orm`, `pg`, and `jiti` (the TypeScript config loader) directly — no
 extra setup. `drizzle-migrator` is a `bin` entry: with pnpm, `pnpm exec drizzle-migrator` or a `"drizzle-migrator"` script

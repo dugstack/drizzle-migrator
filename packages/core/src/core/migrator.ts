@@ -107,14 +107,26 @@ export function createMigrator<D extends DialectAdapter<any, any>>(options: {
     suggestMigrationEntry: () => suggestMigrationEntry(migrations),
     async validateMigrationEntries(options = {}) {
       const { db } = options;
-      // The start marker is written before validating so the audit rows' `at`
-      // values genuinely bracket the run.
+      let auditReady = db !== undefined;
       if (db !== undefined) {
-        await emitAudit(dialect, db, config, { kind: "validation.started" });
+        // Validation can be the first command against an empty database.
+        // Storage failures remain nonfatal, just like audit-write failures.
+        try {
+          await dialect.bootstrapTrackingTables(db, config);
+        } catch (error) {
+          auditReady = false;
+          config.logger.error(
+            "[drizzle-migrator] failed to initialize validation audit storage:",
+            error,
+          );
+        }
+        if (auditReady) {
+          await emitAudit(dialect, db, config, { kind: "validation.started" });
+        }
       }
       try {
         const sorted = await validateRegistry(migrations, config);
-        if (db !== undefined) {
+        if (db !== undefined && auditReady) {
           await emitAudit(dialect, db, config, {
             kind: "validation.completed",
             payload: { status: "passed", migrations: sorted.length },
@@ -123,7 +135,7 @@ export function createMigrator<D extends DialectAdapter<any, any>>(options: {
         return { ok: true, errors: [] };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (db !== undefined) {
+        if (db !== undefined && auditReady) {
           await emitAudit(dialect, db, config, {
             kind: "validation.failed",
             payload: { status: "failed" },

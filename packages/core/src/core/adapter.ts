@@ -26,7 +26,8 @@ export interface DialectAdapter<TDb = unknown, TTx = unknown> {
   ): Promise<void>;
   appendLog(db: TDb | TTx, config: ResolvedConfig, entry: AuditLogEntry): Promise<void>;
   readLogs(db: TDb, config: ResolvedConfig, opts: { limit: number }): Promise<RecentLogRow[]>;
-  hasAnyTableInDefaultSchema(db: TDb): Promise<boolean>;
+  /** Tracking tables alone must never qualify an empty app database for adoption. */
+  hasAnyTableInDefaultSchema(db: TDb, config: ResolvedConfig): Promise<boolean>;
 
   runInTransaction(db: TDb, fn: (tx: TTx) => Promise<void>): Promise<void>;
   executeRaw(tx: TTx, statement: string): Promise<void>;

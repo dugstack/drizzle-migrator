@@ -7,11 +7,19 @@ on:
       - "packages/core/**"
       - "packages/cli/**"
       - ".github/workflows/ci.yml"
+      - ".github/scripts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
   pull_request:
     paths:
       - "packages/core/**"
       - "packages/cli/**"
       - ".github/workflows/ci.yml"
+      - ".github/scripts/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
   workflow_dispatch:
 
 jobs:
@@ -47,3 +55,7 @@ jobs:
 
       - name: Test
         run: pnpm -r test
+
+      # Exercise tarballs in a separate app to catch bundled-driver and export regressions.
+      - name: Packed consumer smoke
+        run: node .github/scripts/smoke-packages.mjs

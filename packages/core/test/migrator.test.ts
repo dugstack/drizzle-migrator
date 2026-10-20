@@ -163,6 +163,29 @@ describe("migrator.validateMigrationEntries", () => {
     expect(fixture.db.logs[1]?.detail).toContain("duplicate version 0.0.1");
   });
 
+  it("preserves validation when initial audit bootstrap fails", async () => {
+    const fixture = await createFixture();
+    await writeValidRegistry(fixture);
+    const dialect = createFakeAdapter(fixture.db);
+    // Audit storage availability must not decide filesystem validation results.
+    dialect.bootstrapTrackingTables = async () => {
+      throw new Error("audit storage unavailable");
+    };
+    const migrator = createMigrator({
+      dialect,
+      config: fixture.config,
+      migrations: [migration0_0_1()],
+    });
+    await expect(migrator.validateMigrationEntries({ db: fixture.db })).resolves.toEqual({
+      ok: true,
+      errors: [],
+    });
+    expect(fixture.db.logs).toHaveLength(0);
+    expect(fixture.logger.lines.join("\n")).toContain(
+      "failed to initialize validation audit storage",
+    );
+  });
+
   it("ignores audit-write failures: the validation result survives", async () => {
     const fixture = await createFixture();
     await writeValidRegistry(fixture);

@@ -110,6 +110,7 @@ describe("cli end-to-end (sqlite)", () => {
       await runCli(["migrate"]);
       expect(process.exitCode).toBe(0);
       expect(infoOutput()).toMatch(/applied 1: 0\.0\.1/);
+      expect(errorOutput()).toBe("");
 
       const db = new Database(dbPath);
       try {
@@ -142,7 +143,9 @@ describe("cli end-to-end (sqlite)", () => {
     "validate with the configured connection records the audit trail",
     async () => {
       process.chdir(project);
-      process.env.SQLITE_PATH = dbPath;
+      // Exercise validation before migrations have created any tracking tables.
+      const validationDbPath = join(project, "data", "validate.db");
+      process.env.SQLITE_PATH = validationDbPath;
 
       process.exitCode = 0;
       infoSpy.mockClear();
@@ -150,7 +153,8 @@ describe("cli end-to-end (sqlite)", () => {
       expect(process.exitCode).toBe(0);
       expect(infoOutput()).toMatch(/registry ok: 1 migration\(s\)/);
 
-      const db = new Database(dbPath);
+      expect(errorOutput()).toBe("");
+      const db = new Database(validationDbPath);
       try {
         const logs = db
           .prepare(

@@ -40,7 +40,7 @@ Two ways to consume the migrator:
 - **CLI executable** — install the CLI package and skip the bin script entirely:
 
   ```sh
-  npm i @dugstack/drizzle-migrator-cli
+  npm i -D @dugstack/drizzle-migrator-cli @dugstack/drizzle-migrator
   ```
 
   The companion package ships the `drizzle-migrator` executable: it owns command dispatch, flag
@@ -51,7 +51,7 @@ Two ways to consume the migrator:
 - **Programmatic only** — install the core and call the service methods from your own tooling:
 
   ```sh
-  npm i @dugstack/drizzle-migrator drizzle-orm pg
+  npm i @dugstack/drizzle-migrator drizzle-orm@0.45.2 pg
   ```
 
   The core package has zero runtime dependencies; `drizzle-orm` is a peer dependency, plus the

@@ -284,8 +284,6 @@ async function runDatabaseCommand(context: CommandContext): Promise<void> {
   }
 
   try {
-    await emitCliCommandAudit(migrator, logger, connection.db, command, flags);
-
     switch (command) {
       case "migrate": {
         const result = await migrator.runMigrations({
@@ -372,6 +370,9 @@ async function runDatabaseCommand(context: CommandContext): Promise<void> {
     logger.error(errorMessage(error));
     process.exitCode = 1;
   } finally {
+    // Commands bootstrap their own tracking tables after safety guards pass.
+    // Record the invocation afterward so first use never writes to missing tables.
+    await emitCliCommandAudit(migrator, logger, connection.db, command, flags);
     await closeConnection(logger, connection);
   }
 }

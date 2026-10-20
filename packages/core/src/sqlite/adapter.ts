@@ -179,9 +179,10 @@ export function createSqliteAdapter(): DialectAdapter<SqliteDatabase, SqliteTran
       }));
     },
 
-    async hasAnyTableInDefaultSchema(db) {
+    async hasAnyTableInDefaultSchema(db, config) {
+      // Audit/bootstrap tables do not prove that an application schema already exists.
       const rows = await db.all(
-        sql`SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' LIMIT 1`,
+        sql`SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT IN (${config.tables.versions}, ${config.tables.logs}) LIMIT 1`,
       );
       return rows.length > 0;
     },

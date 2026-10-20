@@ -9,19 +9,20 @@ The `drizzle-migrator` executable (npm `@dugstack/drizzle-migrator-cli`) for the
 `@dugstack/drizzle-migrator` core. The app owns a `drizzle-migrator.config.ts`, version folders,
 and SQL files produced by `drizzle-kit generate`; the CLI discovers all of them and owns every
 command, prompt, and the database connection, while the core engine keeps the guarantees this
-manual explains: forward-only history, atomic per-migration transactions, a surviving audit
-trail, and compile-time-restricted SQL files.
+manual explains: forward-only history, dialect-specific transactions, an audit trail, and
+compile-time-restricted SQL files. PostgreSQL uses per-migration transactions; SQLite commits
+the whole run together. MySQL DDL implicitly commits and cannot be rolled back.
 
 Every name below (`migrations` schema, `migration_versions` / `migration_logs` tables) is a
-package default — read the app's `migrator.config.ts` first and substitute its configured names.
+package default — read the app's `drizzle-migrator.config.ts` first and substitute its configured names.
 
 ## 1. Required context
 
 Before touching migrations, read, in order:
 
-1. the app's `migrator.config.ts` (sqlDir, migrationsDir, schema, table names, lockName, lock
-   timings, logger);
-2. the versions registry `<migrationsDir>/index.ts`;
+1. the app's `drizzle-migrator.config.ts` (dialect, connection block, drizzleOutDir,
+   migratorOutDir, schema, table names, lockName, and lock timings);
+2. the discovered migration folders `<migratorOutDir>/v<semver>/index.ts`;
 3. the latest version folder `v<semver>/index.ts`;
 4. the app's migration docs, if present.
 
@@ -30,8 +31,9 @@ Before touching migrations, read, in order:
 1. Edit the app's drizzle schema and run `drizzle-kit generate` — generating SQL is the app's
    job; this package never writes SQL files.
 2. Run the drizzle-migrator CLI's `generate` command to scaffold `v<next>/index.ts` from the unapplied
-   SQL files in `sqlDir`.
-3. Register the entry: pass `--register`, or paste the printed snippet into the registry.
+   SQL files in `drizzleOutDir` (or the output directory from `drizzle.config.ts`).
+3. Keep the generated entry under `migratorOutDir`; the CLI auto-discovers version folders.
+   No registry file or registration step is needed.
 4. Run the app's typecheck.
 5. Run `migrate` against a safe local database.
 6. Run `migrate` again and confirm the output says `no pending migrations`.
@@ -42,14 +44,14 @@ Before touching migrations, read, in order:
 - The entry is a **named** export derived mechanically from the version: dots become
   underscores, so `version: "0.0.3"` must be exported as `migration_v0_0_3`. Never a default
   export.
-- Registry imports are fully specified ESM paths:
-  `import { migration_v0_0_3 } from "./v0.0.3/index.js";`
+- The CLI discovers version folders automatically. Manual registries belong only to consumers
+  using the core programmatic API.
 - Helper modules live inside their own version folder and are never imported across versions.
 - `sqlFiles` is the compile-time allowlist: `ctx.runSqlFile` accepts only declared file names,
   and files resolve relative to `config.sqlDir`.
 
 ```ts
-// app: src/db/migrator/versions/v0.0.3/index.ts
+// app: src/db/migrator/v0.0.3/index.ts
 import { defineMigration } from "@dugstack/drizzle-migrator";
 
 export const migration_v0_0_3 = defineMigration({
@@ -92,7 +94,7 @@ async up(ctx) {
   as a separate operational step.
 - Never run migrations from application startup; deployment commands only.
 - Migrator tracking tables must never be added to the app's drizzle-kit schema input (the
-  drift-assertion guard exists precisely because those two definitions must be edited together).
+  tracking tables belong to this package, not the application schema).
 - pg: run against a single dedicated connection (a `pg.Client`, not a shared `Pool`) — the
   advisory lock is session-scoped, so acquire, migrate, and release must share one connection.
 
@@ -108,6 +110,9 @@ async up(ctx) {
   through `--to`. Never widen a range to silence a pending migration.
 
 ## 7. Verification SQL
+
+PostgreSQL examples below. MySQL and SQLite tracking tables have no schema prefix; use
+the selected dialect's identifier quoting.
 
 Defaults shown; substitute the configured schema/table names.
 

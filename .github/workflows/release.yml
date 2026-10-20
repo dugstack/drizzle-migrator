@@ -40,12 +40,26 @@ jobs:
       - name: Build
         run: pnpm -r build
 
+      # Verify the same consumer-facing checks before staging any release.
+      - name: Lint
+        run: pnpm -r lint
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Test
+        run: pnpm -r test
+
+      - name: Packed consumer smoke
+        run: node .github/scripts/smoke-packages.mjs
+
       # A prior run may have staged or published only one package. Skip versions
       # already on npm so retrying stages only the remaining package.
       - name: Version or stage unpublished packages
         uses: changesets/action@v1
         with:
-          version: pnpm changeset version
+          # Changesets rewrites JSON; preserve formatting required by CI.
+          version: pnpm changeset:version
           publish: bash .github/scripts/stage-unpublished-packages.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

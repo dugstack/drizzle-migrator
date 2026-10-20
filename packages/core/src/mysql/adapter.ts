@@ -164,10 +164,11 @@ export function createMysqlAdapter(): DialectAdapter<MysqlDatabase, MysqlTransac
       }));
     },
 
-    async hasAnyTableInDefaultSchema(db) {
+    async hasAnyTableInDefaultSchema(db, config) {
+      // Audit/bootstrap tables do not prove that an application schema already exists.
       const rows = await queryRows<{ present: number }>(
         db,
-        sql`SELECT 1 AS present FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' LIMIT 1`,
+        sql`SELECT 1 AS present FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE' AND table_name NOT IN (${config.tables.versions}, ${config.tables.logs}) LIMIT 1`,
       );
       return rows.length > 0;
     },

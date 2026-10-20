@@ -441,6 +441,12 @@ suite("mysql integration (testcontainers)", () => {
       );
     });
 
+    it("refuses adoption when only tracking tables exist", async () => {
+      // Validation may initialize audit storage before the first migration.
+      await mysqlDialect.bootstrapTrackingTables(env.db, env.config);
+      await expect(adopt()).rejects.toThrow(/no tables in its default schema/);
+    });
+
     it("refuses to run when the CI env var is set", async () => {
       await env.db.execute(sql`CREATE TABLE preexisting (id INT)`);
       process.env.CI = "1";

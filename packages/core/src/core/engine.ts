@@ -76,9 +76,10 @@ export async function runMigrations<TDb, TTx>(
       });
       throw error;
     }
-    await emitAudit({ kind: "lock.acquired", payload: { waitMs: Date.now() - lockStartedAt } });
-
+    const waitMs = Date.now() - lockStartedAt;
+    // A fresh database has no audit table until bootstrap completes under the lock.
     await adapter.bootstrapTrackingTables(db, config);
+    await emitAudit({ kind: "lock.acquired", payload: { waitMs } });
     await emitAudit({
       kind: "bootstrap.completed",
       payload: { schema: config.schema, tables: config.tables },
@@ -250,7 +251,7 @@ export async function adoptMigrations<TDb, TTx>(
     );
   }
 
-  if (!(await adapter.hasAnyTableInDefaultSchema(db))) {
+  if (!(await adapter.hasAnyTableInDefaultSchema(db, config))) {
     throw new Error(
       "adopt: the target database has no tables in its default schema — there is no schema to adopt; run migrate instead",
     );
