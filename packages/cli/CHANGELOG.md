@@ -1,5 +1,18 @@
 # @dugstack/drizzle-migrator-cli
 
+## 0.2.2
+
+### Patch Changes
+
+- defd301: Document direct core installation for migration imports and the supported Drizzle ORM version. Correct bundled agent instructions for automatic migration discovery and dialect transaction guarantees.
+
+  Initialize audit storage before first-run lock and validation events, and record CLI commands after database guards and bootstrap complete.
+
+  Exclude tracking tables from adoption eligibility so validation alone never makes an empty application database adoptable.
+
+- Updated dependencies [defd301]
+  - @dugstack/drizzle-migrator@0.3.1
+
 ## 0.2.1
 
 ### Patch Changes
